@@ -4912,7 +4912,6 @@ int sdl_main(int argc, char *argv[])
 
 		control->StartUp(); // Run the machine until shutdown
 		control.reset();  // Shutdown and release
-
 	} catch (char *error) {
 		rcode = 1;
 		GFX_ShowMsg("Exit to error: %s",error);
@@ -4935,6 +4934,10 @@ int sdl_main(int argc, char *argv[])
 		// just exit
 		rcode = 1;
 	}
+
+#if (C_DEBUG)
+		DEBUG_StopHost();
+#endif
 
 #if defined (WIN32)
 	sticky_keys(true); //Might not be needed if the shutdown function switches to windowed mode, but it doesn't hurt

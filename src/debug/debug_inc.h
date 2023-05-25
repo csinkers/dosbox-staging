@@ -18,7 +18,6 @@
 
 /* Local Debug Function */
 
-
 #include <curses.h>
 #include "mem.h"
 

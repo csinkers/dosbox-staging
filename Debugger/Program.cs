@@ -128,7 +128,7 @@ static class Program
         new(new[] { "Connect" }, _ => host => host.Connect()),
         new(new[] { "Detach" }, _ => host => host.Detach()),
         new(new[] { "Exit", "q" }, _ => host => host.Exit()),
-        new(new[] { "Continue", "go", "g" }, _ => host => host.Continue()),
+        new(new[] { "Continue", "g" }, _ => host => host.Continue()),
         new(new[] { "Break", "b" }, _ => host => PrintReg(host.Break())),
         new(new[] { "StepOver", "p" }, _ => host => PrintReg(host.StepOver())),
         new(new[] { "StepIn", "n" }, _ => host => PrintReg(host.StepIn())),
@@ -179,7 +179,7 @@ static class Program
             host.SetReg(reg, value);
         })
     }.SelectMany(x => x.Names.Select(name => (name, x)))
-     .ToDictionary(x => x.name, x => x.x);
+     .ToDictionary(x => x.name.ToUpperInvariant(), x => x.x);
 
     static void RunCommand(string line, DebugHostPrx debugHost)
     {

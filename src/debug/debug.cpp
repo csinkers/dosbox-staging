@@ -335,7 +335,6 @@ public:
 	static void				DeleteAll			(void);
 	static void				ShowList			(void);
 
-
 private:
 	EBreakpoint type = {};
 	// Physical
@@ -624,7 +623,6 @@ bool CBreakpoint::DeleteBreakpoint(uint16_t seg, uint32_t off)
 	return false;
 }
 
-
 void CBreakpoint::ShowList(void)
 {
 	// iterate list
@@ -764,7 +762,6 @@ static void DrawRegisters(void) {
 	SetColor(changed_flags&FLAG_AF); mvwprintw (dbg.win_reg,1,65,"%01X",GETFLAG(AF) ? 1:0);
 	SetColor(changed_flags&FLAG_PF); mvwprintw (dbg.win_reg,1,68,"%01X",GETFLAG(PF) ? 1:0);
 
-
 	SetColor(changed_flags&FLAG_DF); mvwprintw (dbg.win_reg,1,71,"%01X",GETFLAG(DF) ? 1:0);
 	SetColor(changed_flags&FLAG_IF); mvwprintw (dbg.win_reg,1,74,"%01X",GETFLAG(IF) ? 1:0);
 	SetColor(changed_flags&FLAG_TF); mvwprintw (dbg.win_reg,1,77,"%01X",GETFLAG(TF) ? 1:0);
@@ -824,7 +821,6 @@ static void DrawCode(void) {
 				wattrset(dbg.win_code,0);
 			}
 		}
-
 
 		Bitu drawsize=size=DasmI386(dline, start, disEIP, cpu.code.big);
 		bool toolarge = false;
@@ -1306,7 +1302,6 @@ bool ParseCommand(char* str) {
 		return true;
 	}
 
-
 #if C_HEAVY_DEBUG
 	if (command == "HEAVYLOG") { // Create Cpu log file
 		logHeavy = !logHeavy;
@@ -1561,7 +1556,6 @@ char* AnalyzeInstruction(char* inst, bool saveSelector) {
 	return result;
 }
 
-
 int32_t DEBUG_Run(int32_t amount,bool quickexit) {
 	skipFirstInstruction = true;
 	CPU_Cycles = amount;
@@ -1579,8 +1573,6 @@ int32_t DEBUG_Run(int32_t amount,bool quickexit) {
 	}
 	return ret;
 }
-
-
 
 uint32_t DEBUG_CheckKeys(void) {
 	Bits ret=0;
@@ -1852,6 +1844,7 @@ Bitu DEBUG_Loop(void)
 	uint32_t oldEIP = reg_eip;
 	PIC_runIRQs();
 	Delay(1);
+
 	if ((oldCS != SegValue(cs)) || (oldEIP != reg_eip)) {
 		CBreakpoint::AddBreakpoint(oldCS, oldEIP, true);
 		CBreakpoint::ActivateBreakpointsExceptAt(SegPhys(cs) + reg_eip);
@@ -1859,6 +1852,8 @@ Bitu DEBUG_Loop(void)
 		DOSBOX_SetNormalLoop();
 		return 0;
 	}
+
+	DEBUG_PollWork();
 	return DEBUG_CheckKeys();
 }
 
@@ -1904,6 +1899,9 @@ void DEBUG_Enable(bool pressed)
 	DOSBOX_SetLoop(&DEBUG_Loop);
 
 	KEYBOARD_ClrBuffer();
+
+	// Start debug host thread
+	DEBUG_StartHost();
 }
 
 void DEBUG_DrawScreen(void) {
@@ -2248,8 +2246,7 @@ void DEBUG_Init(Section* sec) {
 //	MSG_Add("DEBUG_CONFIGFILE_HELP","Debugger related options.\n");
 	DEBUG_DrawScreen();
 	/* Add some keyhandlers */
-	MAPPER_AddHandler(DEBUG_Enable, SDL_SCANCODE_PAUSE, MMOD2, "debugger",
-	                  "Debugger");
+	MAPPER_AddHandler(DEBUG_Enable, SDL_SCANCODE_PAUSE, MMOD2, "debugger", "Debugger");
 	/* Reset code overview and input line */
 	codeViewData = {};
 	/* setup debug.com */
@@ -2302,9 +2299,7 @@ bool CDebugVar::SaveVars(char *name)
 		DEBUG_ShowMsg("DEBUG: Output of vars failed.\n");
 		return false;
 	}
-	DEBUG_ShowMsg("DEBUG: vars file '%s' created.\n",
-	              std_fs::absolute(vars_file).string().c_str());
-
+	DEBUG_ShowMsg("DEBUG: vars file '%s' created.\n", std_fs::absolute(vars_file).string().c_str());
 
 	// write number of vars
 	uint16_t num = (uint16_t)varList.size();

@@ -16,7 +16,6 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-
 #include "dosbox.h"
 
 #if C_DEBUG
@@ -54,8 +53,6 @@ static _LogGroup loggrp[LOG_MAX]={{"",true},{0,false}};
 static FILE *debuglog = nullptr;
 
 extern int old_cursor_state;
-
-
 
 void DEBUG_ShowMsg(char const* format,...) {
 	// Quit early if the window hasn't been created yet
@@ -133,7 +130,6 @@ void LOG::operator() (char const* format, ...){
 	DEBUG_ShowMsg("%10u: %s:%s\n",static_cast<uint32_t>(cycle_count),loggrp[d_type].front,buf);
 }
 
-
 static void Draw_RegisterLayout(void) {
 	// Quit early if the window hasn't been created yet
 	if (!dbg.win_reg)
@@ -164,7 +160,6 @@ static void Draw_RegisterLayout(void) {
 	mvwaddstr(dbg.win_reg,1,52,"C  Z  S  O  A  P  D  I  T ");
 }
 
-
 static void DrawBars(void) {
 	if (has_colors()) {
 		attrset(COLOR_PAIR(PAIR_BLACK_BLUE));
@@ -182,8 +177,6 @@ static void DrawBars(void) {
 	attrset(0);
 	//Match values with below. So we don't need to touch the internal window structures
 }
-
-
 
 static void MakeSubWindows(void) {
 	/* The Std output win should go at the bottom */
@@ -241,7 +234,6 @@ static void LOG_Init(Section * sec) {
 	}
 }
 
-
 void LOG_StartUp(void) {
 	/* Setup logging groups */
 	loggrp[LOG_ALL].front="ALL";
@@ -289,9 +281,6 @@ void LOG_StartUp(void) {
 //	MSG_Add("LOG_CONFIGFILE_HELP","Logging related options for the debugger.\n");
 }
 
-
-
-
 void DBGUI_StartUp(void) {
 	/* Start the main window */
 	dbg.win_main = initscr();
@@ -306,7 +295,6 @@ void DBGUI_StartUp(void) {
 	cycle_count = 0;
 	MakePairs();
 	MakeSubWindows();
-
 }
 
 #endif
