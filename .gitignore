@@ -81,3 +81,8 @@ tools/superanalyze_mpeg_ps
 tools/superanalyze_mpeg_ps.exe
 tools/unlock_the_magic_mpeg_ps
 tools/unlock_the_magic_mpeg_ps.exe
+
+Debugger/bin
+Debugger/generated
+Debugger/obj
+vs/packages

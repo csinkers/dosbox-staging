@@ -10,11 +10,13 @@
         "libmt32emu",
         "libpng",
         "opusfile",
+        "pdcurses",
         "sdl2",
         "sdl2-image",
         "sdl2-net",
         "speexdsp",
         "tracy",
+        "zeroc-ice",
         "zlib"
     ]
 }

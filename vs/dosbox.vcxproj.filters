@@ -1,21 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="..\src\capture\capture.cpp">
-      <Filter>src\capture</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\capture\capture_audio.cpp">
-      <Filter>src\capture</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\capture\capture_image.cpp">
-      <Filter>src\capture</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\capture\capture_midi.cpp">
-      <Filter>src\capture</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\capture\capture_video.cpp">
-      <Filter>src\capture</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\cpu\callback.cpp">
       <Filter>src\cpu</Filter>
     </ClCompile>
@@ -161,9 +146,6 @@
       <Filter>src\hardware</Filter>
     </ClCompile>
     <ClCompile Include="..\src\hardware\gus.cpp">
-      <Filter>src\hardware</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\hardware\hardware.cpp">
       <Filter>src\hardware</Filter>
     </ClCompile>
     <ClCompile Include="..\src\hardware\ide.cpp">
@@ -444,9 +426,6 @@
     </ClCompile>
     <ClCompile Include="..\src\libs\nuked\opl3.c">
       <Filter>src\libs\nuked</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\libs\ppscale\ppscale.c">
-      <Filter>src\libs\ppscale</Filter>
     </ClCompile>
     <ClCompile Include="..\src\misc\cross.cpp">
       <Filter>src\misc</Filter>
@@ -820,14 +799,37 @@
     <ClCompile Include="..\src\libs\zmbv\zmbv_vfw.cpp">
       <Filter>src\libs\zmbv</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\capture\capture.cpp" />
+    <ClCompile Include="..\src\capture\capture_audio.cpp" />
+    <ClCompile Include="..\src\capture\capture_image.cpp" />
+    <ClCompile Include="..\src\capture\capture_midi.cpp" />
+    <ClCompile Include="..\src\capture\capture_video.cpp" />
+    <ClCompile Include="..\src\debug\debug_host.cpp">
+      <Filter>src\debug</Filter>
+    </ClCompile>
+    <ClCompile Include="Win32\Debug\debug_protocol.cpp">
+      <Filter>Source Files\Win32\Debug</Filter>
+    </ClCompile>
+    <ClCompile Include="x64\Debug\debug_protocol.cpp">
+      <Filter>Source Files\x64\Debug</Filter>
+    </ClCompile>
+    <ClCompile Include="Win32\Release\debug_protocol.cpp">
+      <Filter>Source Files\Win32\Release</Filter>
+    </ClCompile>
+    <ClCompile Include="x64\Release\debug_protocol.cpp">
+      <Filter>Source Files\x64\Release</Filter>
+    </ClCompile>
+    <ClCompile Include="Win32\Tracy\debug_protocol.cpp">
+      <Filter>Source Files\Win32\Tracy</Filter>
+    </ClCompile>
+    <ClCompile Include="x64\Tracy\debug_protocol.cpp">
+      <Filter>Source Files\x64\Tracy</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\audio_frame.h">
       <Filter>include</Filter>
     </ClInclude>
-    <ClCompile Include="..\include\autoexec.h">
-      <Filter>src\shell</Filter>
-    </ClCompile>
     <ClInclude Include="..\include\bios.h">
       <Filter>include</Filter>
     </ClInclude>
@@ -966,21 +968,6 @@
     <ClInclude Include="..\include\video.h">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\capture\capture.h">
-      <Filter>src\capture</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\capture\capture_audio.h">
-      <Filter>src\capture</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\capture\capture_image.h">
-      <Filter>src\capture</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\capture\capture_midi.h">
-      <Filter>src\capture</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\capture\capture_video.h">
-      <Filter>src\capture</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\cpu\core_dynrec\decoder.h">
       <Filter>src\cpu\core_dynrec</Filter>
     </ClInclude>
@@ -1107,42 +1094,18 @@
     <ClInclude Include="..\src\hardware\adlib_gold.h">
       <Filter>src\hardware</Filter>
     </ClInclude>
-    <ClCompile Include="..\src\hardware\compressor.h">
-      <Filter>src\hardware</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\hardware\covox.h">
-      <Filter>src\hardware</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\hardware\disney.h">
-      <Filter>src\hardware</Filter>
-    </ClCompile>
     <ClInclude Include="..\src\hardware\gameblaster.h">
       <Filter>src\hardware</Filter>
     </ClInclude>
     <ClInclude Include="..\src\hardware\innovation.h">
       <Filter>src\hardware</Filter>
     </ClInclude>
-    <ClCompile Include="..\src\hardware\lpt_dac.h">
-      <Filter>src\hardware</Filter>
-    </ClCompile>
     <ClInclude Include="..\src\hardware\opl.h">
       <Filter>src\hardware</Filter>
     </ClInclude>
     <ClInclude Include="..\src\hardware\pci_devices.h">
       <Filter>src\hardware</Filter>
     </ClInclude>
-    <ClCompile Include="..\src\hardware\pcspeaker.h">
-      <Filter>src\hardware</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\hardware\pcspeaker_discrete.h">
-      <Filter>src\hardware</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\hardware\pcspeaker_impulse.h">
-      <Filter>src\hardware</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\hardware\ston1_dac.h">
-      <Filter>src\hardware</Filter>
-    </ClCompile>
     <ClInclude Include="..\src\hardware\input\intel8042.h">
       <Filter>src\hardware\input</Filter>
     </ClInclude>
@@ -1235,9 +1198,6 @@
     </ClInclude>
     <ClInclude Include="..\src\libs\nuked\opl3.h">
       <Filter>src\libs\nuked</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\libs\ppscale\ppscale.h">
-      <Filter>src\libs\ppscale</Filter>
     </ClInclude>
     <ClInclude Include="..\src\platform\visualc\config.h">
       <Filter>src\platform\visualc</Filter>
@@ -1368,9 +1328,6 @@
     <ClInclude Include="..\src\dos\program_serial.h">
       <Filter>src\dos</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\dos\program_tree.h">
-      <Filter>src\dos</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\libs\loguru\loguru.hpp">
       <Filter>src\libs\loguru</Filter>
     </ClInclude>
@@ -1395,6 +1352,38 @@
     <ClInclude Include="..\src\libs\zmbv\Resource.h" />
     <ClInclude Include="..\src\libs\zmbv\zmbv.h">
       <Filter>src\libs\zmbv</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\autoexec.h" />
+    <ClInclude Include="..\src\capture\capture.h" />
+    <ClInclude Include="..\src\capture\capture_audio.h" />
+    <ClInclude Include="..\src\capture\capture_image.h" />
+    <ClInclude Include="..\src\capture\capture_midi.h" />
+    <ClInclude Include="..\src\capture\capture_video.h" />
+    <ClInclude Include="..\src\hardware\compressor.h" />
+    <ClInclude Include="..\src\hardware\covox.h" />
+    <ClInclude Include="..\src\hardware\disney.h" />
+    <ClInclude Include="..\src\hardware\lpt_dac.h" />
+    <ClInclude Include="..\src\hardware\pcspeaker.h" />
+    <ClInclude Include="..\src\hardware\pcspeaker_discrete.h" />
+    <ClInclude Include="..\src\hardware\pcspeaker_impulse.h" />
+    <ClInclude Include="..\src\hardware\ston1_dac.h" />
+    <ClInclude Include="Win32\Debug\debug_protocol.h">
+      <Filter>Header Files\Win32\Debug</Filter>
+    </ClInclude>
+    <ClInclude Include="x64\Debug\debug_protocol.h">
+      <Filter>Header Files\x64\Debug</Filter>
+    </ClInclude>
+    <ClInclude Include="Win32\Release\debug_protocol.h">
+      <Filter>Header Files\Win32\Release</Filter>
+    </ClInclude>
+    <ClInclude Include="x64\Release\debug_protocol.h">
+      <Filter>Header Files\x64\Release</Filter>
+    </ClInclude>
+    <ClInclude Include="Win32\Tracy\debug_protocol.h">
+      <Filter>Header Files\Win32\Tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="x64\Tracy\debug_protocol.h">
+      <Filter>Header Files\x64\Tracy</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -1528,5 +1517,72 @@
     <Filter Include="src\libs\zmbv">
       <UniqueIdentifier>{99b19861-c042-4e3e-bf24-ee8a418866f6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Slice Files">
+      <UniqueIdentifier>{4094eab0-3511-4465-90ed-95699d63432f}</UniqueIdentifier>
+      <Extensions>ice</Extensions>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{445b2dbf-2005-43ed-8d93-cd612d671332}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Win32">
+      <UniqueIdentifier>{ffb5d736-581f-4ae8-a397-9388d56d7dfc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Win32\Debug">
+      <UniqueIdentifier>{12a88653-c233-42cd-bc46-ac611c4fab41}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\x64">
+      <UniqueIdentifier>{7137aef7-917c-42c1-b598-09fa6e6f8d8b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\x64\Debug">
+      <UniqueIdentifier>{d5ea5514-d679-4cc8-aec6-55f851131341}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Win32\Release">
+      <UniqueIdentifier>{077c34aa-e6ee-425d-b720-7d40c0907127}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\x64\Release">
+      <UniqueIdentifier>{96562eb7-ba7f-4885-9362-39d3c1c75bfc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Win32\Tracy">
+      <UniqueIdentifier>{3b3aa00f-d180-45f3-8542-9fdcd683e9f9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\x64\Tracy">
+      <UniqueIdentifier>{8c724a6f-7125-4a64-9258-26389d1d4403}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{3e97e228-8908-4876-9327-f8e4799b2894}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Win32">
+      <UniqueIdentifier>{8eb7e4de-2614-4338-98ee-2826d2074c76}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Win32\Debug">
+      <UniqueIdentifier>{09d0bb0b-b7c1-4a65-bae6-dd4737196706}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\x64">
+      <UniqueIdentifier>{5d2e064b-fa64-47c1-bce0-e510a889f063}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\x64\Debug">
+      <UniqueIdentifier>{dba94c5b-bc2d-4542-8d00-a791e70b8071}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Win32\Release">
+      <UniqueIdentifier>{e3973ec7-dd9b-4599-a478-0366a5af25be}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\x64\Release">
+      <UniqueIdentifier>{459bcb06-c3c6-48a7-b520-b1ca01be9549}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Win32\Tracy">
+      <UniqueIdentifier>{085eb689-c62d-4ee2-9480-4de7fb32efd4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\x64\Tracy">
+      <UniqueIdentifier>{08011006-802a-49d8-ba53-ac5c830ba688}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\vcpkg.json" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <SliceCompile Include="..\debug_protocol.ice">
+      <Filter>Slice Files</Filter>
+    </SliceCompile>
   </ItemGroup>
 </Project>

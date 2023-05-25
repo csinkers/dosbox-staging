@@ -92,12 +92,10 @@ public:
 };
 #endif
 
-
 class DEBUG;
 
 DEBUG*	pDebugcom	= 0;
 bool	exitLoop	= false;
-
 
 // Heavy Debugging Vars for logging
 #if C_HEAVY_DEBUG
@@ -737,56 +735,43 @@ static void DrawData(void) {
 
 static void DrawRegisters(void) {
 	/* Main Registers */
-	SetColor(reg_eax!=oldregs.eax);oldregs.eax=reg_eax;mvwprintw (dbg.win_reg,0,4,"%08X",reg_eax);
-	SetColor(reg_ebx!=oldregs.ebx);oldregs.ebx=reg_ebx;mvwprintw (dbg.win_reg,1,4,"%08X",reg_ebx);
-	SetColor(reg_ecx!=oldregs.ecx);oldregs.ecx=reg_ecx;mvwprintw (dbg.win_reg,2,4,"%08X",reg_ecx);
-	SetColor(reg_edx!=oldregs.edx);oldregs.edx=reg_edx;mvwprintw (dbg.win_reg,3,4,"%08X",reg_edx);
+	SetColor(reg_eax!=oldregs.eax); oldregs.eax=reg_eax; mvwprintw (dbg.win_reg,0,4,"%08X",reg_eax);
+	SetColor(reg_ebx!=oldregs.ebx); oldregs.ebx=reg_ebx; mvwprintw (dbg.win_reg,1,4,"%08X",reg_ebx);
+	SetColor(reg_ecx!=oldregs.ecx); oldregs.ecx=reg_ecx; mvwprintw (dbg.win_reg,2,4,"%08X",reg_ecx);
+	SetColor(reg_edx!=oldregs.edx); oldregs.edx=reg_edx; mvwprintw (dbg.win_reg,3,4,"%08X",reg_edx);
 
-	SetColor(reg_esi!=oldregs.esi);oldregs.esi=reg_esi;mvwprintw (dbg.win_reg,0,18,"%08X",reg_esi);
-	SetColor(reg_edi!=oldregs.edi);oldregs.edi=reg_edi;mvwprintw (dbg.win_reg,1,18,"%08X",reg_edi);
-	SetColor(reg_ebp!=oldregs.ebp);oldregs.ebp=reg_ebp;mvwprintw (dbg.win_reg,2,18,"%08X",reg_ebp);
-	SetColor(reg_esp!=oldregs.esp);oldregs.esp=reg_esp;mvwprintw (dbg.win_reg,3,18,"%08X",reg_esp);
-	SetColor(reg_eip!=oldregs.eip);oldregs.eip=reg_eip;mvwprintw (dbg.win_reg,1,42,"%08X",reg_eip);
+	SetColor(reg_esi!=oldregs.esi); oldregs.esi=reg_esi; mvwprintw (dbg.win_reg,0,18,"%08X",reg_esi);
+	SetColor(reg_edi!=oldregs.edi); oldregs.edi=reg_edi; mvwprintw (dbg.win_reg,1,18,"%08X",reg_edi);
+	SetColor(reg_ebp!=oldregs.ebp); oldregs.ebp=reg_ebp; mvwprintw (dbg.win_reg,2,18,"%08X",reg_ebp);
+	SetColor(reg_esp!=oldregs.esp); oldregs.esp=reg_esp; mvwprintw (dbg.win_reg,3,18,"%08X",reg_esp);
+	SetColor(reg_eip!=oldregs.eip); oldregs.eip=reg_eip; mvwprintw (dbg.win_reg,1,42,"%08X",reg_eip);
 
-	SetColor(SegValue(ds)!=oldsegs[ds].val);oldsegs[ds].val=SegValue(ds);mvwprintw (dbg.win_reg,0,31,"%04X",SegValue(ds));
-	SetColor(SegValue(es)!=oldsegs[es].val);oldsegs[es].val=SegValue(es);mvwprintw (dbg.win_reg,0,41,"%04X",SegValue(es));
-	SetColor(SegValue(fs)!=oldsegs[fs].val);oldsegs[fs].val=SegValue(fs);mvwprintw (dbg.win_reg,0,51,"%04X",SegValue(fs));
-	SetColor(SegValue(gs)!=oldsegs[gs].val);oldsegs[gs].val=SegValue(gs);mvwprintw (dbg.win_reg,0,61,"%04X",SegValue(gs));
-	SetColor(SegValue(ss)!=oldsegs[ss].val);oldsegs[ss].val=SegValue(ss);mvwprintw (dbg.win_reg,0,71,"%04X",SegValue(ss));
-	SetColor(SegValue(cs)!=oldsegs[cs].val);oldsegs[cs].val=SegValue(cs);mvwprintw (dbg.win_reg,1,31,"%04X",SegValue(cs));
+	SetColor(SegValue(ds)!=oldsegs[ds].val); oldsegs[ds].val=SegValue(ds); mvwprintw (dbg.win_reg,0,31,"%04X",SegValue(ds));
+	SetColor(SegValue(es)!=oldsegs[es].val); oldsegs[es].val=SegValue(es); mvwprintw (dbg.win_reg,0,41,"%04X",SegValue(es));
+	SetColor(SegValue(fs)!=oldsegs[fs].val); oldsegs[fs].val=SegValue(fs); mvwprintw (dbg.win_reg,0,51,"%04X",SegValue(fs));
+	SetColor(SegValue(gs)!=oldsegs[gs].val); oldsegs[gs].val=SegValue(gs); mvwprintw (dbg.win_reg,0,61,"%04X",SegValue(gs));
+	SetColor(SegValue(ss)!=oldsegs[ss].val); oldsegs[ss].val=SegValue(ss); mvwprintw (dbg.win_reg,0,71,"%04X",SegValue(ss));
+	SetColor(SegValue(cs)!=oldsegs[cs].val); oldsegs[cs].val=SegValue(cs); mvwprintw (dbg.win_reg,1,31,"%04X",SegValue(cs));
 
 	/*Individual flags*/
 	Bitu changed_flags = reg_flags ^ oldflags;
 	oldflags = reg_flags;
 
-	SetColor(changed_flags&FLAG_CF);
-	mvwprintw (dbg.win_reg,1,53,"%01X",GETFLAG(CF) ? 1:0);
-	SetColor(changed_flags&FLAG_ZF);
-	mvwprintw (dbg.win_reg,1,56,"%01X",GETFLAG(ZF) ? 1:0);
-	SetColor(changed_flags&FLAG_SF);
-	mvwprintw (dbg.win_reg,1,59,"%01X",GETFLAG(SF) ? 1:0);
-	SetColor(changed_flags&FLAG_OF);
-	mvwprintw (dbg.win_reg,1,62,"%01X",GETFLAG(OF) ? 1:0);
-	SetColor(changed_flags&FLAG_AF);
-	mvwprintw (dbg.win_reg,1,65,"%01X",GETFLAG(AF) ? 1:0);
-	SetColor(changed_flags&FLAG_PF);
-	mvwprintw (dbg.win_reg,1,68,"%01X",GETFLAG(PF) ? 1:0);
+	SetColor(changed_flags&FLAG_CF); mvwprintw (dbg.win_reg,1,53,"%01X",GETFLAG(CF) ? 1:0);
+	SetColor(changed_flags&FLAG_ZF); mvwprintw (dbg.win_reg,1,56,"%01X",GETFLAG(ZF) ? 1:0);
+	SetColor(changed_flags&FLAG_SF); mvwprintw (dbg.win_reg,1,59,"%01X",GETFLAG(SF) ? 1:0);
+	SetColor(changed_flags&FLAG_OF); mvwprintw (dbg.win_reg,1,62,"%01X",GETFLAG(OF) ? 1:0);
+	SetColor(changed_flags&FLAG_AF); mvwprintw (dbg.win_reg,1,65,"%01X",GETFLAG(AF) ? 1:0);
+	SetColor(changed_flags&FLAG_PF); mvwprintw (dbg.win_reg,1,68,"%01X",GETFLAG(PF) ? 1:0);
 
 
-	SetColor(changed_flags&FLAG_DF);
-	mvwprintw (dbg.win_reg,1,71,"%01X",GETFLAG(DF) ? 1:0);
-	SetColor(changed_flags&FLAG_IF);
-	mvwprintw (dbg.win_reg,1,74,"%01X",GETFLAG(IF) ? 1:0);
-	SetColor(changed_flags&FLAG_TF);
-	mvwprintw (dbg.win_reg,1,77,"%01X",GETFLAG(TF) ? 1:0);
+	SetColor(changed_flags&FLAG_DF); mvwprintw (dbg.win_reg,1,71,"%01X",GETFLAG(DF) ? 1:0);
+	SetColor(changed_flags&FLAG_IF); mvwprintw (dbg.win_reg,1,74,"%01X",GETFLAG(IF) ? 1:0);
+	SetColor(changed_flags&FLAG_TF); mvwprintw (dbg.win_reg,1,77,"%01X",GETFLAG(TF) ? 1:0);
 
-	SetColor(changed_flags&FLAG_IOPL);
-	mvwprintw (dbg.win_reg,2,72,"%01X",GETFLAG(IOPL)>>12);
+	SetColor(changed_flags&FLAG_IOPL); mvwprintw (dbg.win_reg,2,72,"%01X",GETFLAG(IOPL)>>12);
 
-
-	SetColor(cpu.cpl ^ oldcpucpl);
-	mvwprintw (dbg.win_reg,2,78,"%01" PRIXPTR ,cpu.cpl);
-	oldcpucpl=cpu.cpl;
+	SetColor(cpu.cpl ^ oldcpucpl); mvwprintw (dbg.win_reg,2,78,"%01" PRIXPTR ,cpu.cpl); oldcpucpl=cpu.cpl;
 
 	if (cpu.pmode) {
 		if (reg_flags & FLAG_VM) mvwprintw(dbg.win_reg,0,76,"VM86");
@@ -1858,18 +1843,19 @@ uint32_t DEBUG_CheckKeys(void) {
 	return ret;
 }
 
-Bitu DEBUG_Loop(void) {
-//TODO Disable sound
+Bitu DEBUG_Loop(void)
+{
+	// TODO Disable sound
 	GFX_Events();
 	// Interrupt started ? - then skip it
-	uint16_t oldCS	= SegValue(cs);
-	uint32_t oldEIP	= reg_eip;
+	uint16_t oldCS  = SegValue(cs);
+	uint32_t oldEIP = reg_eip;
 	PIC_runIRQs();
 	Delay(1);
-	if ((oldCS!=SegValue(cs)) || (oldEIP!=reg_eip)) {
-		CBreakpoint::AddBreakpoint(oldCS,oldEIP,true);
-		CBreakpoint::ActivateBreakpointsExceptAt(SegPhys(cs)+reg_eip);
-		debugging=false;
+	if ((oldCS != SegValue(cs)) || (oldEIP != reg_eip)) {
+		CBreakpoint::AddBreakpoint(oldCS, oldEIP, true);
+		CBreakpoint::ActivateBreakpointsExceptAt(SegPhys(cs) + reg_eip);
+		debugging = false;
 		DOSBOX_SetNormalLoop();
 		return 0;
 	}

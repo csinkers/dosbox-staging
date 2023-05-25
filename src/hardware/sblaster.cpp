@@ -556,7 +556,7 @@ static void configure_opl_filter(mixer_channel_t channel,
 
 static void SB_RaiseIRQ(SB_IRQS type)
 {
-	LOG(LOG_SB, LOG_NORMAL)("Raising IRQ");
+	// LOG(LOG_SB, LOG_NORMAL)("Raising IRQ");
 	switch (type) {
 	case SB_IRQ_8:
 		if (sb.irq.pending_8bit) {
