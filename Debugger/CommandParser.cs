@@ -27,13 +27,13 @@ static class CommandParser
         return int.Parse(s);
     }
 
-    static void PrintAsm(AssemblyLine[] lines)
+    static void PrintAsm(AssemblyLine[] lines, ITracer log)
     {
         foreach (var line in lines)
-            Console.WriteLine($"{line.address.segment:X}:{line.address.offset:X8} {line.line}");
+            log.Debug($"{line.address.segment:X}:{line.address.offset:X8} {line.line}");
     }
 
-    static void PrintBytes(byte[] bytes)
+    static void PrintBytes(byte[] bytes, ITracer log)
     {
         const string hexChars = "0123456789ABCDEF";
         var result = new StringBuilder(bytes.Length * 2);
@@ -48,13 +48,13 @@ static class CommandParser
             result.Append(i % 2 == 0 ? ' ' : '-');
         }
 
-        Console.WriteLine(result.ToString());
+        log.Debug(result.ToString());
     }
 
-    static void PrintBps(Breakpoint[] breakpoints)
+    static void PrintBps(Breakpoint[] breakpoints, ITracer log)
     {
         foreach (var bp in breakpoints)
-            Console.WriteLine($"{bp.address.segment:X}:{bp.address.offset:X8} {bp.type} {bp.ah:X2} {bp.al:X2}");
+            log.Debug($"{bp.address.segment:X}:{bp.address.offset:X8} {bp.type} {bp.ah:X2} {bp.al:X2}");
     }
 
     static Register ParseReg(string s) =>
@@ -97,8 +97,9 @@ static class CommandParser
             _ => throw new FormatException($"Unexpected breakpoint type \"{s}\"")
         };
 
-    static void PrintReg(Registers reg)
+    static void UpdateRegisters(Registers reg, Debugger d)
     {
+        d.Registers = reg;
         var flagsSb = new StringBuilder();
         var flags = (CpuFlags)reg.flags;
         if ((flags & CpuFlags.CF) != 0) flagsSb.Append(" C");
@@ -112,16 +113,16 @@ static class CommandParser
         if ((flags & CpuFlags.IF) != 0) flagsSb.Append(" I");
         if ((flags & CpuFlags.TF) != 0) flagsSb.Append(" T");
 
-        Console.WriteLine($"EAX {reg.eax:X8} ESI {reg.esi:X8} DS {reg.ds:X4} ES {reg.es:X4}");
-        Console.WriteLine($"EBX {reg.ebx:X8} EDI {reg.edi:X8} FS {reg.fs:X4} GS {reg.gs:X4}");
-        Console.WriteLine($"ECX {reg.ecx:X8} EBP {reg.ebp:X8}");
-        Console.WriteLine($"EDX {reg.edx:X8} ESP {reg.esp:X8} SS {reg.ss:X4}");
-        Console.WriteLine($"CS {reg.cs:X4} EIP {reg.eip:X8}{flagsSb}");
+        d.Log.Debug($"EAX {reg.eax:X8} ESI {reg.esi:X8} DS {reg.ds:X4} ES {reg.es:X4}");
+        d.Log.Debug($"EBX {reg.ebx:X8} EDI {reg.edi:X8} FS {reg.fs:X4} GS {reg.gs:X4}");
+        d.Log.Debug($"ECX {reg.ecx:X8} EBP {reg.ebp:X8}");
+        d.Log.Debug($"EDX {reg.edx:X8} ESP {reg.esp:X8} SS {reg.ss:X4}");
+        d.Log.Debug($"CS {reg.cs:X4} EIP {reg.eip:X8}{flagsSb}");
     }
 
     static readonly Dictionary<string, Command> Commands = new Command[]
         {
-            new(new[] {"help", "?"}, "Show help", _ => _ =>
+            new(new[] {"help", "?"}, "Show help", _ => d =>
             {
                 var commands = Commands.Values.Distinct().OrderBy(x => x.Names[0]).ToList();
                 int maxLength = 0;
@@ -136,21 +137,23 @@ static class CommandParser
                 {
                     var names = string.Join(" ", cmd.Names);
                     var pad = new string(' ', maxLength - names.Length);
-                    Console.WriteLine($"{names}{pad}: {cmd.Description}");
+                    d.Log.Debug($"{names}{pad}: {cmd.Description}");
                 }
             }),
+            new(new []  { "clear", "cls" }, "Clear the log history", _ => d => d.Log.Clear()),
 
-            new(new[] { "Connect", "!" }, "Register the callback proxy for 'breakpoint hit' alerts", _ => d => d.Host.Connect(d.DebugClientPrx)),
+            new(new[] { "Connect", "!" }, "Register the callback proxy for 'breakpoint hit' alerts",
+                _ => d => d.Host.Connect(d.DebugClientPrx)),
             new(new[] { "Continue", "g" }, "Resume execution", _ => d => d.Host.Continue()),
 
             // TODO
-            new(new[] { "Break", "b" }, "Pause execution", _ => d => PrintReg(d.Host.Break())),
+            new(new[] { "Break", "b" }, "Pause execution", _ => d => UpdateRegisters(d.Host.Break(), d)),
             new(new[] { "StepOver", "p" }, "Steps to the next instruction, ignoring function calls / interrupts etc", _ => d => { }),
-            new(new[] { "StepIn", "n" }, "Steps to the next instruction, including into function calls etc", _ => d => PrintReg(d.Host.StepIn())),
+            new(new[] { "StepIn", "n" }, "Steps to the next instruction, including into function calls etc", _ => d => UpdateRegisters(d.Host.StepIn(), d)),
             new(new[] { "StepMultiple", "gn" }, "Runs the CPU for the given number of cycles", getArg => d =>
             {
                 var n = ParseVal(getArg());
-                PrintReg(d.Host.StepMultiple(n));
+                UpdateRegisters(d.Host.StepMultiple(n), d);
             }),
             new(new[] { "StepOut", "go" }, "Run until the current function returns", _ => d => { }),
             new(new[] { "RunToCall", "gc" }, "Run until the next 'call' instruction is encountered", _ => d => { }),
@@ -161,19 +164,19 @@ static class CommandParser
                 d.Host.RunToAddress(address);
             }),
 
-            new(new[] { "GetState", "r" }, "Get the current CPU state", _ => d => PrintReg(d.Host.GetState())),
+            new(new[] { "GetState", "r" }, "Get the current CPU state", _ => d => UpdateRegisters(d.Host.GetState(), d)),
             new(new[] { "Disassemble", "u" }, "Disassemble instructions at the given address", getArg => d =>
             {
                 var address = ParseAddress(getArg());
                 var length = ParseVal(getArg());
-                PrintAsm(d.Host.Disassemble(address, length));
+                PrintAsm(d.Host.Disassemble(address, length), d.Log);
             }),
 
             new(new[] { "GetMemory", "d" }, "Gets the contents of memory at the given address", getArg => d =>
             {
                 var address = ParseAddress(getArg());
                 var length = ParseVal(getArg());
-                PrintBytes(d.Host.GetMemory(address, length));
+                PrintBytes(d.Host.GetMemory(address, length), d.Log);
             }),
             new(new[] { "SetMemory", "e" }, "Changes the contents of memory at the given address", getArg => d =>
             {
@@ -183,7 +186,7 @@ static class CommandParser
                 d.Host.SetMemory(address, bytes);
             }),
 
-            new(new[] { "ListBreakpoints", "bps", "bl" }, "Retrieves the current breakpoint list", _ => d => PrintBps(d.Host.ListBreakpoints())),
+            new(new[] { "ListBreakpoints", "bps", "bl" }, "Retrieves the current breakpoint list", _ => d => PrintBps(d.Host.ListBreakpoints(), d.Log)),
             new(new[] { "SetBreakpoint", "bp" }, "<address> [type] [ah] [al] - Sets or updates a breakpoint", getArg => d =>
             {
                 var address = ParseAddress(getArg());
@@ -215,26 +218,27 @@ static class CommandParser
         }.SelectMany(x => x.Names.Select(name => (name, x)))
         .ToDictionary(x => x.name.ToUpperInvariant(), x => x.x);
 
-    public static void RunCommand(string line, Debugger debugger)
+    public static void RunCommand(string line, Debugger d)
     {
         try
         {
-            var parts = line.Split(' ');
-            if (parts.Length == 0)
+            if (string.IsNullOrWhiteSpace(line))
                 return;
 
+            var parts = line.Split(' ');
             var name = parts[0].ToUpperInvariant();
+
             if (Commands.TryGetValue(name, out var command))
             {
                 int curArg = 1;
                 var func = command.BuildCommand(() => curArg >= parts.Length ? "" : parts[curArg++]);
-                func(debugger);
+                func(d);
             }
-            else Console.WriteLine($"Unknown command \"{parts[0]}\"");
+            else d.Log.Error($"Unknown command \"{parts[0]}\"");
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Parse error: " + ex.Message);
+            d.Log.Error("Parse error: " + ex.Message);
         }
     }
 }

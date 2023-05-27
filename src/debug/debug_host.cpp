@@ -123,10 +123,10 @@ class Clients {
 		}
 	}
 
-	void ForEach(std::function<void(std::shared_ptr<DebugClientPrx>)> func)
+	void ForEach(const std::function<void(std::shared_ptr<DebugClientPrx>)> &func)
 	{
 		unique_lock ul(m_);
-		for (auto& it : clients_) {
+		for (const auto& it : clients_) {
 			func(it);
 		}
 	}
@@ -388,7 +388,6 @@ class DebugHostImpl : public DebugHost {
 	}
 };
 
-static std::unique_ptr<std::thread> g_debugThread;
 static shared_ptr<Ice::Communicator> communicator;
 
 static void ServerThread()
@@ -407,6 +406,19 @@ static void ServerThread()
 	}
 }
 
+static void AlertClients()
+{
+	Registers state;
+	GetRegisters(state);
+	g_clients.ForEach([&state](auto client) {
+		client->StoppedAsync(
+		    state,
+		    [] {},
+		    [client](const exception_ptr&) { g_clients.Remove(client); });
+	});
+}
+
+static std::unique_ptr<std::thread> g_debugThread;
 void DEBUG_StartHost()
 {
 	if (g_debugThread) {
@@ -424,36 +436,19 @@ void DEBUG_StopHost()
 
 	communicator->shutdown();
 	g_debugThread->join();
-}
-
-static void AlertClients()
-{
-	printf("Hit BP\n");
-	Registers state;
-	GetRegisters(state);
-	g_clients.ForEach([&state](auto client) {
-		printf("Alerting client\n");
-		client->StoppedAsync(
-		    state,
-		    [] { printf("Client alerted OK\n"); },
-		    [client](exception_ptr) {
-			    printf("Client error - removing proxy\n");
-			    g_clients.Remove(client);
-		    });
-	});
+	g_debugThread.reset();
 }
 
 static LoopHandler* lastLoop;
 void DEBUG_PollWork()
 {
 	auto loop = DOSBOX_GetLoop();
-	if (loop != lastLoop) {
-		if (loop == DEBUG_Loop) {
-			AlertClients();
-		}
+	if (loop != lastLoop && loop == DEBUG_Loop) {
+		AlertClients();
 	}
 
 	g_queue.process();
+
 	// Don't need to send an alert if the debugger changed the state
 	lastLoop = DOSBOX_GetLoop();
 }
