@@ -24,6 +24,7 @@ module DosboxDebugger
 
 	enum BreakpointType 
 	{
+		Unknown,
 		Normal,
 		Read,
 		Write,
@@ -34,7 +35,6 @@ module DosboxDebugger
 
 	struct Breakpoint
 	{
-		int number; // -1 = create new
 		Address address;
 		BreakpointType type; 
 		byte ah;
@@ -45,34 +45,29 @@ module DosboxDebugger
 	sequence<AssemblyLine> AssemblySequence;
 	sequence<Breakpoint> BreakpointSequence;
 
+    interface DebugClient
+    {
+		void Stopped(Registers state);
+    }
+
     interface DebugHost
     {
-		void Connect();
-		void Detach();
-		void Exit();
-
+		void Connect(DebugClient* proxy);
 		void Continue();
 		Registers Break();
-		Registers StepOver();
 		Registers StepIn();
-		Registers StepOut();
-		Registers RunToCall();
-		Registers RunToAddress(Address address);
+		Registers StepMultiple(int cycles);
+		void RunToAddress(Address address);
 		Registers GetState();
 
 		AssemblySequence Disassemble(Address address, int length);
 		ByteSequence GetMemory(Address address, int length);
+		void SetMemory(Address address, ByteSequence bytes);
 
 		BreakpointSequence ListBreakpoints();
 		void SetBreakpoint(Breakpoint breakpoint);
-		void DelBreakpoint(int bpNumber);
+		void DelBreakpoint(Address address);
 
 		void SetReg(Register reg, int value);
-    }
-
-    interface DebugClient
-    {
-		void Running();
-		void Stopped(Registers state);
     }
 }

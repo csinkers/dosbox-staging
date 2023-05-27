@@ -462,6 +462,7 @@ IF %ERRORLEVEL% LSS 8 SET ERRORLEVEL = 0</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\debug\debug_bp.cpp" />
     <ClCompile Include="..\src\debug\debug_host.cpp" />
     <ClCompile Include="..\src\dosbox.cpp" />
     <ClCompile Include="..\src\libs\PDCurses\pdcurses\addch.c" />
@@ -879,6 +880,7 @@ IF %ERRORLEVEL% LSS 8 SET ERRORLEVEL = 0</Command>
     <ClInclude Include="..\src\cpu\lazyflags.h" />
     <ClInclude Include="..\src\cpu\modrm.h" />
     <ClInclude Include="..\src\debug\debug_inc.h" />
+    <ClInclude Include="..\src\debug\debug_internal.h" />
     <ClInclude Include="..\src\dos\cdrom.h" />
     <ClInclude Include="..\src\dos\dev_con.h" />
     <ClInclude Include="..\src\dos\dos_mscdex.h" />

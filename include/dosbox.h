@@ -50,6 +50,7 @@ double DOSBOX_GetUptime();
 
 void DOSBOX_RunMachine();
 void DOSBOX_SetLoop(LoopHandler * handler);
+LoopHandler* DOSBOX_GetLoop();
 void DOSBOX_SetNormalLoop();
 
 void DOSBOX_Init(void);

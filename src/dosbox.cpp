@@ -157,6 +157,7 @@ static Bitu Normal_Loop() {
 				if (GCC_UNLIKELY(blah)) return blah;
 			}
 #if C_DEBUG
+			DEBUG_PollWork();
 			if (DEBUG_ExitLoop()) return 0;
 #endif
 		} else {
@@ -303,6 +304,10 @@ void increaseticks() { //Make it return ticksRemain and set it in the function a
 
 void DOSBOX_SetLoop(LoopHandler * handler) {
 	loop=handler;
+}
+
+LoopHandler* DOSBOX_GetLoop() {
+	return loop;
 }
 
 void DOSBOX_SetNormalLoop() {
