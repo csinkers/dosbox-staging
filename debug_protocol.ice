@@ -36,7 +36,7 @@ module DosboxDebugger
 	struct Breakpoint { Address address; BreakpointType type; byte ah; byte al; }
 	sequence<Breakpoint> BreakpointSequence;
 
-	struct AssemblyLine { Address address; string line; }
+	struct AssemblyLine { Address address; string line; ByteSequence bytes; }
 	sequence<AssemblyLine> AssemblySequence;
 
     interface DebugClient

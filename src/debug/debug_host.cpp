@@ -5,6 +5,7 @@
 #include <mutex>
 #include <thread>
 
+#include "debug_inc.h"
 #include "debug_internal.h"
 #include "debug_protocol.h"
 
@@ -202,8 +203,31 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 	                             const ::Ice::Current& current) override
 	{
 		auto result = DosboxDebugger::AssemblySequence();
-		Do([&address, &length] {
+		Do([&address, &length, &result] {
 			printf("-> Disassemble(%x:%x, %d)\n", address.segment, address.offset, length);
+
+			char buffer[200];
+			PhysPt start = GetAddress(address.segment, address.offset);
+			PhysPt cur = start;
+			for (int i = 0; i < length; i++) {
+				Bitu size = DasmI386(buffer, cur, cur, cpu.code.big);
+
+				DosboxDebugger::AssemblyLine line;
+				line.address.segment = address.segment;
+				line.address.offset = address.offset + (cur - start);
+				line.line = buffer;
+
+				for (Bitu c = 0; c < size; c++) {
+					uint8_t value;
+					if (mem_readb_checked((PhysPt)(cur + c), &value)) {
+						value = 0;
+					}
+					line.bytes.push_back(value);
+				}
+
+				result.push_back(line);
+				cur = (PhysPt)(cur + size);
+			}
 		});
 		return result;
 	}

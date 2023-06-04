@@ -5,10 +5,25 @@ namespace DosboxDebugger;
 
 static class CommandParser
 {
-    static uint ParseOffset(string s, Debugger d)
+    static uint ParseOffset(string s, Debugger d, out int segmentHint)
     {
+        segmentHint = 0;
         if (!uint.TryParse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var offset))
         {
+            var upper = s.ToUpperInvariant();
+            switch (upper)
+            {
+                case "EAX": segmentHint = d.Registers.ds; return (uint)d.Registers.eax;
+                case "EBX": segmentHint = d.Registers.ds; return (uint)d.Registers.ebx;
+                case "ECX": segmentHint = d.Registers.ds; return (uint)d.Registers.ecx;
+                case "EDX": segmentHint = d.Registers.ds; return (uint)d.Registers.edx;
+                case "ESI": segmentHint = d.Registers.ds; return (uint)d.Registers.esi;
+                case "EDI": segmentHint = d.Registers.ds; return (uint)d.Registers.edi;
+                case "EBP": segmentHint = d.Registers.ss; return (uint)d.Registers.ebp;
+                case "ESP": segmentHint = d.Registers.ss; return (uint)d.Registers.esp;
+                case "EIP": segmentHint = d.Registers.cs; return (uint)d.Registers.eip;
+            }
+
             if (!d.TryFindSymbol(s, out offset))
                 throw new FormatException($"Could not resolve an address for \"{s}\"");
         }
@@ -24,8 +39,9 @@ static class CommandParser
 
         if (index == -1)
         {
-            segment = code ? d.Registers.cs : d.Registers.ds;
-            offset = ParseOffset(s, d);
+            offset = ParseOffset(s, d, out segment);
+            if (segment == 0)
+                segment = code ? d.Registers.cs : d.Registers.ds;
         }
         else
         {
@@ -44,7 +60,7 @@ static class CommandParser
                 };
             }
 
-            offset = ParseOffset(s[(index+1)..], d);
+            offset = ParseOffset(s[(index+1)..], d, out _);
         }
 
         var signedOffset = unchecked((int)offset);
@@ -68,20 +84,32 @@ static class CommandParser
             log.Debug($"{line.address.segment:X}:{line.address.offset:X8} {line.line}");
     }
 
-    static void PrintBytes(byte[] bytes, ITracer log)
+    static void PrintBytes(Address address, byte[] bytes, ITracer log)
     {
         const string hexChars = "0123456789ABCDEF";
         var result = new StringBuilder(bytes.Length * 2);
+        var chars = new StringBuilder(16);
         for (var i = 0; i < bytes.Length; i++)
         {
             if (i % 16 == 0)
+            {
+                result.Append(chars);
+                chars.Clear();
                 result.AppendLine();
+                result.Append($"{address.segment:X}:{address.offset + i:X8}: ");
+            }
 
             var b = bytes[i];
             result.Append(hexChars[b >> 4]);
             result.Append(hexChars[b & 0xf]);
-            result.Append(i % 2 == 0 ? ' ' : '-');
+            result.Append(i % 2 == 0 ? '-' : ' ');
+            char c = (char)b;
+            if (c < 0x20 || c > 0x7f) c = '.';
+            chars.Append(c);
         }
+
+        if (chars.Length > 0)
+            result.Append(chars);
 
         log.Debug(result.ToString());
     }
@@ -234,16 +262,28 @@ static class CommandParser
             new(new[] { "GetState", "r" }, "Get the current CPU state", (_,  d) => UpdateRegisters(d.Host.GetState(), d)),
             new(new[] { "Disassemble", "u" }, "Disassemble instructions at the given address", (getArg,  d) =>
             {
-                var address = ParseAddress(getArg(), d, true);
-                var length = ParseVal(getArg());
+                var addressArg = getArg();
+                var address = addressArg == "" 
+                    ? new Address(d.Registers.cs, d.Registers.eip)
+                    : ParseAddress(addressArg, d, true);
+
+                var lengthArg = getArg();
+                var length = addressArg == "" || lengthArg == ""
+                    ? 10
+                    : ParseVal(lengthArg);
+
                 PrintAsm(d.Host.Disassemble(address, length), d.Log);
             }),
 
             new(new[] { "GetMemory", "d" }, "Gets the contents of memory at the given address", (getArg,  d) =>
             {
                 var address = ParseAddress(getArg(), d, false);
-                var length = ParseVal(getArg());
-                PrintBytes(d.Host.GetMemory(address, length), d.Log);
+                var lengthArg = getArg();
+                var length = lengthArg == ""
+                    ? 64
+                    : ParseVal(lengthArg);
+
+                PrintBytes(address, d.Host.GetMemory(address, length), d.Log);
             }),
             new(new[] { "SetMemory", "e" }, "Changes the contents of memory at the given address", (getArg,  d) =>
             {
