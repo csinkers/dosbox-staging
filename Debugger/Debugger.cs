@@ -25,6 +25,12 @@ public class Debugger
         DebugClientPrx = ice.ClientProxy;
     }
 
+    public bool TryFindSymbol(string name, out uint offset)
+    {
+        offset = 0;
+        return false;
+    }
+
     void OnStopped(Registers state)
     {
         Console.WriteLine(" -> Stopped");

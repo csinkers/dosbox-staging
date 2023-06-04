@@ -9,9 +9,8 @@
 #include "debug_protocol.h"
 
 using namespace std;
-using namespace DosboxDebugger;
 
-static void GetRegisters(Registers& result)
+static void GetRegisters(DosboxDebugger::Registers& result)
 {
 	result.flags = (int)reg_flags;
 	result.eax   = (int)reg_eax;
@@ -92,10 +91,10 @@ class ManualResetEvent {
 
 class Clients {
 	mutex m_;
-	vector<std::shared_ptr<DebugClientPrx>> clients_;
+	vector<std::shared_ptr<DosboxDebugger::DebugClientPrx>> clients_;
 
 	public:
-	void Add(std::shared_ptr<DebugClientPrx> proxy)
+	void Add(std::shared_ptr<DosboxDebugger::DebugClientPrx> proxy)
 	{
 		unique_lock ul(m_);
 		const auto& it = std::find_if(clients_.begin(),
@@ -109,7 +108,7 @@ class Clients {
 		}
 	}
 
-	void Remove(std::shared_ptr<DebugClientPrx> proxy)
+	void Remove(std::shared_ptr<DosboxDebugger::DebugClientPrx> proxy)
 	{
 		unique_lock ul(m_);
 		const auto& it = std::remove_if(clients_.begin(),
@@ -123,7 +122,7 @@ class Clients {
 		}
 	}
 
-	void ForEach(const std::function<void(std::shared_ptr<DebugClientPrx>)> &func)
+	void ForEach(const std::function<void(std::shared_ptr<DosboxDebugger::DebugClientPrx>)> &func)
 	{
 		unique_lock ul(m_);
 		for (const auto& it : clients_) {
@@ -132,9 +131,9 @@ class Clients {
 	}
 } g_clients;
 
-class DebugHostImpl : public DebugHost {
+class DebugHostImpl : public DosboxDebugger::DebugHost {
 	public:
-	void Connect(std::shared_ptr<DebugClientPrx> proxy,
+	void Connect(std::shared_ptr<DosboxDebugger::DebugClientPrx> proxy,
 	             const Ice::Current& current) override
 	{
 		g_clients.Add(proxy);
@@ -148,9 +147,9 @@ class DebugHostImpl : public DebugHost {
 		});
 	}
 
-	Registers Break(const ::Ice::Current& current) override
+	DosboxDebugger::Registers Break(const ::Ice::Current& current) override
 	{
-		Registers result;
+		DosboxDebugger::Registers result;
 		Do([&result] {
 			printf("-> Break\n");
 			DOSBOX_SetLoop(&DEBUG_Loop);
@@ -159,9 +158,9 @@ class DebugHostImpl : public DebugHost {
 		return result;
 	}
 
-	Registers StepIn(const ::Ice::Current& current) override
+	DosboxDebugger::Registers StepIn(const ::Ice::Current& current) override
 	{
-		Registers result;
+		DosboxDebugger::Registers result;
 		Do([&result] {
 			printf("-> StepIn\n");
 			DEBUG_Run(1, true);
@@ -170,9 +169,9 @@ class DebugHostImpl : public DebugHost {
 		return result;
 	}
 
-	Registers StepMultiple(int cycles, const ::Ice::Current& current) override
+	DosboxDebugger::Registers StepMultiple(int cycles, const ::Ice::Current& current) override
 	{
-		Registers result;
+		DosboxDebugger::Registers result;
 		Do([&cycles, &result] {
 			printf("-> StepMultiple(%d)\n", cycles);
 			DEBUG_Run(cycles, true);
@@ -181,7 +180,7 @@ class DebugHostImpl : public DebugHost {
 		return result;
 	}
 
-	void RunToAddress(Address address, const ::Ice::Current& current) override
+	void RunToAddress(DosboxDebugger::Address address, const ::Ice::Current& current) override
 	{
 		Do([&address] {
 			printf("-> RunToAddress(%x:%x)\n", (int)address.segment, address.offset);
@@ -192,27 +191,27 @@ class DebugHostImpl : public DebugHost {
 		});
 	}
 
-	Registers GetState(const ::Ice::Current& current) override
+	DosboxDebugger::Registers GetState(const ::Ice::Current& current) override
 	{
-		Registers result;
+		DosboxDebugger::Registers result;
 		Do([&result] { GetRegisters(result); });
 		return result;
 	}
 
-	AssemblySequence Disassemble(Address address, int length,
+	DosboxDebugger::AssemblySequence Disassemble(DosboxDebugger::Address address, int length,
 	                             const ::Ice::Current& current) override
 	{
-		auto result = AssemblySequence();
+		auto result = DosboxDebugger::AssemblySequence();
 		Do([&address, &length] {
 			printf("-> Disassemble(%x:%x, %d)\n", address.segment, address.offset, length);
 		});
 		return result;
 	}
 
-	ByteSequence GetMemory(Address address, int length,
+	DosboxDebugger::ByteSequence GetMemory(DosboxDebugger::Address address, int length,
 	                       const ::Ice::Current& current) override
 	{
-		auto result = ByteSequence(length);
+		auto result = DosboxDebugger::ByteSequence(length);
 		Do([&address, &length, &result] {
 			printf("-> GetMemory(%x:%x, %d)\n", address.segment, address.offset, length);
 			const auto uoff = (uint32_t)address.offset;
@@ -227,7 +226,7 @@ class DebugHostImpl : public DebugHost {
 		return result;
 	}
 
-	void SetMemory(Address address, ByteSequence bytes,
+	void SetMemory(DosboxDebugger::Address address, DosboxDebugger::ByteSequence bytes,
 	               const Ice::Current& current) override
 	{
 		Do([&address, &bytes] {
@@ -237,18 +236,18 @@ class DebugHostImpl : public DebugHost {
 			       bytes.size());
 			const auto uoff = (uint32_t)address.offset;
 			for (Bitu x = 0; x < bytes.size(); x++) {
-				const auto physAddr = GetAddress(address.segment, uoff + x);
+				const auto physAddr = GetAddress(address.segment, (uint32_t)(uoff + x));
 				mem_writeb_checked(physAddr, bytes[x]);
 			}
 		});
 	}
 
-	BreakpointSequence ListBreakpoints(const ::Ice::Current& current) override
+	DosboxDebugger::BreakpointSequence ListBreakpoints(const ::Ice::Current& current) override
 	{
-		BreakpointSequence result;
+		DosboxDebugger::BreakpointSequence result;
 		Do([&result] {
 			for (auto& it = CBreakpoint::begin(); it != CBreakpoint::end(); ++it) {
-				result.push_back(Breakpoint());
+				result.push_back(DosboxDebugger::Breakpoint());
 				auto& bp = result.back();
 
 				bp.address.segment = (*it)->GetSegment();
@@ -257,27 +256,27 @@ class DebugHostImpl : public DebugHost {
 				bp.al              = 0;
 
 				switch ((*it)->GetType()) {
-				case BKPNT_PHYSICAL: bp.type = BreakpointType::Normal; break;
+				case BKPNT_PHYSICAL: bp.type = DosboxDebugger::BreakpointType::Normal; break;
 
 				case BKPNT_INTERRUPT:
 					if ((*it)->GetValue() == BPINT_ALL) {
-						bp.type = BreakpointType::Interrupt;
+						bp.type = DosboxDebugger::BreakpointType::Interrupt;
 					} else if ((*it)->GetOther() == BPINT_ALL) {
-						bp.type = BreakpointType::InterruptWithAH;
-						bp.ah   = (*it)->GetValue();
+						bp.type = DosboxDebugger::BreakpointType::InterruptWithAH;
+						bp.ah   = (unsigned char)(*it)->GetValue();
 					} else {
-						bp.type = BreakpointType::InterruptWithAX;
-						bp.ah   = (*it)->GetValue();
-						bp.al   = (*it)->GetOther();
+						bp.type = DosboxDebugger::BreakpointType::InterruptWithAX;
+						bp.ah   = (unsigned char)(*it)->GetValue();
+						bp.al   = (unsigned char)(*it)->GetOther();
 					}
 					break;
 
-				case BKPNT_MEMORY: bp.type = BreakpointType::Read; break;
+				case BKPNT_MEMORY: bp.type = DosboxDebugger::BreakpointType::Read; break;
 
 				case BKPNT_UNKNOWN:
 				case BKPNT_MEMORY_PROT:
 				case BKPNT_MEMORY_LINEAR:
-					bp.type = BreakpointType::Unknown;
+					bp.type = DosboxDebugger::BreakpointType::Unknown;
 					break;
 				}
 			}
@@ -286,27 +285,27 @@ class DebugHostImpl : public DebugHost {
 		return result;
 	}
 
-	void SetBreakpoint(Breakpoint breakpoint, const ::Ice::Current& current) override
+	void SetBreakpoint(DosboxDebugger::Breakpoint breakpoint, const ::Ice::Current& current) override
 	{
 		Do([&breakpoint] {
 			const char* typeName = "Unk";
 			switch (breakpoint.type) {
-			case BreakpointType::Normal:
+			case DosboxDebugger::BreakpointType::Normal:
 				typeName = "Normal";
 				CBreakpoint::AddBreakpoint(breakpoint.address.segment,
 				                           breakpoint.address.offset,
 				                           false);
 				break;
 
-			case BreakpointType::Read:
+			case DosboxDebugger::BreakpointType::Read:
 				typeName = "Read";
 				CBreakpoint::AddMemBreakpoint(breakpoint.address.segment,
 				                              breakpoint.address.offset);
 				break;
 
-			case BreakpointType::Write: typeName = "Write"; break;
+			case DosboxDebugger::BreakpointType::Write: typeName = "Write"; break;
 
-			case BreakpointType::Interrupt:
+			case DosboxDebugger::BreakpointType::Interrupt:
 				typeName = "Interrupt";
 				CBreakpoint::AddIntBreakpoint((uint8_t)breakpoint.address.offset,
 				                              BPINT_ALL,
@@ -314,7 +313,7 @@ class DebugHostImpl : public DebugHost {
 				                              false);
 				break;
 
-			case BreakpointType::InterruptWithAH:
+			case DosboxDebugger::BreakpointType::InterruptWithAH:
 				typeName = "IntAH";
 				CBreakpoint::AddIntBreakpoint((uint8_t)breakpoint.address.offset,
 				                              breakpoint.ah,
@@ -322,7 +321,7 @@ class DebugHostImpl : public DebugHost {
 				                              false);
 				break;
 
-			case BreakpointType::InterruptWithAX:
+			case DosboxDebugger::BreakpointType::InterruptWithAX:
 				typeName = "IntAX";
 				CBreakpoint::AddIntBreakpoint((uint8_t)breakpoint.address.offset,
 				                              breakpoint.ah,
@@ -340,7 +339,7 @@ class DebugHostImpl : public DebugHost {
 		});
 	}
 
-	void DelBreakpoint(Address address, const ::Ice::Current& current) override
+	void DelBreakpoint(DosboxDebugger::Address address, const ::Ice::Current& current) override
 	{
 		Do([&address] {
 			printf("-> DelBreakpoint(%x:%x)\n", address.segment, address.offset);
@@ -348,31 +347,89 @@ class DebugHostImpl : public DebugHost {
 		});
 	}
 
-	void SetReg(Register reg, int value, const ::Ice::Current& current) override
+	void SetReg(DosboxDebugger::Register reg, int value, const ::Ice::Current& current) override
 	{
 		Do([&reg, &value] {
 			const char* regName = "";
 			switch (reg) {
-			case Register::Flags: regName = "Flags"; break;
-			case Register::EAX: regName = "EAX"; break;
-			case Register::EBX: regName = "EBX"; break;
-			case Register::ECX: regName = "ECX"; break;
-			case Register::EDX: regName = "EDX"; break;
-			case Register::ESI: regName = "ESI"; break;
-			case Register::EDI: regName = "EDI"; break;
-			case Register::EBP: regName = "EBP"; break;
-			case Register::ESP: regName = "ESP"; break;
-			case Register::EIP: regName = "EIP"; break;
-			case Register::ES: regName = "ES"; break;
-			case Register::CS: regName = "CS"; break;
-			case Register::SS: regName = "SS"; break;
-			case Register::DS: regName = "DS"; break;
-			case Register::FS: regName = "FS"; break;
-			case Register::GS: regName = "GS"; break;
+			case DosboxDebugger::Register::Flags: regName = "Flags"; break;
+			case DosboxDebugger::Register::EAX: regName = "EAX"; break;
+            case DosboxDebugger::Register::EBX: regName = "EBX"; break;
+			case DosboxDebugger::Register::ECX: regName = "ECX"; break;
+			case DosboxDebugger::Register::EDX: regName = "EDX"; break;
+			case DosboxDebugger::Register::ESI: regName = "ESI"; break;
+			case DosboxDebugger::Register::EDI: regName = "EDI"; break;
+			case DosboxDebugger::Register::EBP: regName = "EBP"; break;
+			case DosboxDebugger::Register::ESP: regName = "ESP"; break;
+			case DosboxDebugger::Register::EIP: regName = "EIP"; break;
+			case DosboxDebugger::Register::ES: regName = "ES"; break;
+			case DosboxDebugger::Register::CS: regName = "CS"; break;
+			case DosboxDebugger::Register::SS: regName = "SS"; break;
+			case DosboxDebugger::Register::DS: regName = "DS"; break;
+			case DosboxDebugger::Register::FS: regName = "FS"; break;
+			case DosboxDebugger::Register::GS: regName = "GS"; break;
 			}
 
 			printf("-> SetReg(%s, %x)\n", regName, value);
 		});
+	}
+
+	void AddDescriptor(DosboxDebugger::Descriptors& results, Descriptor& desc)
+	{
+		if (desc.Type() & 0x04) { // Gate
+			auto result    = std::make_shared<DosboxDebugger::GateDescriptor>();
+			result->type   = (DosboxDebugger::SegmentType)desc.Type();
+			result->offset = (int)desc.GetOffset();
+			result->selector = (int)desc.GetSelector();
+			result->dpl      = desc.DPL();
+			result->big      = !!desc.Big();
+			results.push_back(result);
+		} else { // Segment
+			auto result = std::make_shared<DosboxDebugger::SegmentDescriptor>();
+			result->type  = (DosboxDebugger::SegmentType)desc.Type();
+			result->base  = (int)desc.GetBase();
+			result->limit = (int)desc.GetLimit();
+			result->dpl   = desc.DPL();
+			result->big   = desc.Big();
+			results.push_back(result);
+		}
+	}
+
+	DosboxDebugger::Descriptors GetGdt(const Ice::Current& current) override
+	{
+		Descriptor desc;
+		Bitu length    = cpu.gdt.GetLimit();
+		PhysPt address = cpu.gdt.GetBase();
+		PhysPt max     = (PhysPt)(address + length);
+
+		DosboxDebugger::Descriptors results;
+		while (address < max) {
+			desc.Load(address);
+			AddDescriptor(results, desc);
+			address += 8;
+		}
+		return results;
+	}
+
+	DosboxDebugger::Descriptors GetLdt(const Ice::Current& current) override
+	{
+		DosboxDebugger::Descriptors results;
+		Descriptor desc;
+		Bitu ldtSelector = cpu.gdt.SLDT();
+
+		if (!cpu.gdt.GetDescriptor(ldtSelector, desc)) {
+			return results;
+		}
+
+		Bitu length    = desc.GetLimit();
+		PhysPt address = desc.GetBase();
+		PhysPt max     = (PhysPt)(address + length);
+		while (address < max) {
+			desc.Load(address);
+			AddDescriptor(results, desc);
+			address += 8;
+		}
+		return results;
 	}
 
 	private:
@@ -408,7 +465,7 @@ static void ServerThread()
 
 static void AlertClients()
 {
-	Registers state;
+	DosboxDebugger::Registers state;
 	GetRegisters(state);
 	g_clients.ForEach([&state](auto client) {
 		client->StoppedAsync(

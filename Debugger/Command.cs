@@ -1,19 +1,18 @@
 ﻿namespace DosboxDebugger;
 
 public delegate string GetArg();
-public delegate void DebugCommand(Debugger d);
-public delegate DebugCommand CommandBuilder(GetArg getArg);
+public delegate void DebugCommand(GetArg getArg, Debugger d);
 
 public class Command
 {
-    public Command(string[] names, string description, CommandBuilder buildCommand)
+    public Command(string[] names, string description, DebugCommand func)
     {
         Names = names ?? throw new ArgumentNullException(nameof(names));
         Description = description;
-        BuildCommand = buildCommand ?? throw new ArgumentNullException(nameof(buildCommand));
+        Func = func ?? throw new ArgumentNullException(nameof(func));
     }
 
     public string[] Names { get; }
     public string Description { get; }
-    public CommandBuilder BuildCommand { get; }
+    public DebugCommand Func { get; }
 }

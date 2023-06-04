@@ -5,15 +5,50 @@ namespace DosboxDebugger;
 
 static class CommandParser
 {
-    static Address ParseAddress(string s)
+    static uint ParseOffset(string s, Debugger d)
+    {
+        if (!uint.TryParse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var offset))
+        {
+            if (!d.TryFindSymbol(s, out offset))
+                throw new FormatException($"Could not resolve an address for \"{s}\"");
+        }
+
+        return offset;
+    }
+
+    static Address ParseAddress(string s, Debugger d, bool code)
     {
         int index = s.IndexOf(':');
-        if (index == -1)
-            throw new FormatException("Expected : in address");
+        uint offset;
+        int segment;
 
-        var segment = unchecked((short)ushort.Parse(s[..index], NumberStyles.HexNumber));
-        var offset = unchecked((int)uint.Parse(s[(index + 1)..], NumberStyles.HexNumber));
-        return new Address(segment, offset);
+        if (index == -1)
+        {
+            segment = code ? d.Registers.cs : d.Registers.ds;
+            offset = ParseOffset(s, d);
+        }
+        else
+        {
+            var part = s[..index];
+            if (!int.TryParse(part, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out segment))
+            {
+                segment = part.ToUpperInvariant() switch
+                {
+                    "CS" => d.Registers.cs,
+                    "DS" => d.Registers.ds,
+                    "SS" => d.Registers.ss,
+                    "ES" => d.Registers.es,
+                    "FS" => d.Registers.fs,
+                    "GS" => d.Registers.gs,
+                    _ => throw new FormatException($"Invalid segment \"{part}\"")
+                };
+            }
+
+            offset = ParseOffset(s[(index+1)..], d);
+        }
+
+        var signedOffset = unchecked((int)offset);
+        return new Address(unchecked((short)segment), signedOffset);
     }
 
     static int ParseVal(string s)
@@ -55,6 +90,38 @@ static class CommandParser
     {
         foreach (var bp in breakpoints)
             log.Debug($"{bp.address.segment:X}:{bp.address.offset:X8} {bp.type} {bp.ah:X2} {bp.al:X2}");
+    }
+
+    static void PrintDescriptors(Descriptor[] descriptors, bool ldt, ITracer log)
+    {
+        for(int i = 0; i < descriptors.Length; i++)
+        {
+            var descriptor = descriptors[i];
+            switch (descriptor.type)
+            {
+                case SegmentType.SysInvalid:
+                    break;
+
+                case SegmentType.Sys286CallGate:
+                case SegmentType.SysTaskGate:
+                case SegmentType.Sys286IntGate:
+                case SegmentType.Sys286TrapGate:
+                case SegmentType.Sys386CallGate:
+                case SegmentType.Sys386IntGate:
+                case SegmentType.Sys386TrapGate:
+                    var gate = (GateDescriptor)descriptor;
+                    log.Debug($"{i:X4} {gate.type} {(gate.big ? "32" : "16")} {gate.selector:X4}: {gate.offset:X8} R{gate.dpl}");
+                    break;
+
+                default:
+                    var seg = (SegmentDescriptor)descriptor;
+                    ushort selector = (ushort)((i << 3) | seg.dpl);
+                    if (ldt)
+                        selector |= 4;
+                    log.Debug($"{i:X4}={selector:X4} {seg.type} {(seg.big ? "32" : "16")} {seg.@base:X8} {seg.limit:X8} R{seg.dpl}");
+                    break;
+            }
+        }
     }
 
     static Register ParseReg(string s) =>
@@ -122,7 +189,7 @@ static class CommandParser
 
     static readonly Dictionary<string, Command> Commands = new Command[]
         {
-            new(new[] {"help", "?"}, "Show help", _ => d =>
+            new(new[] {"help", "?"}, "Show help", (_,  d) =>
             {
                 var commands = Commands.Values.Distinct().OrderBy(x => x.Names[0]).ToList();
                 int maxLength = 0;
@@ -140,56 +207,56 @@ static class CommandParser
                     d.Log.Debug($"{names}{pad}: {cmd.Description}");
                 }
             }),
-            new(new []  { "clear", "cls" }, "Clear the log history", _ => d => d.Log.Clear()),
+            new(new []  { "clear", "cls" }, "Clear the log history", (_,  d) => d.Log.Clear()),
 
             new(new[] { "Connect", "!" }, "Register the callback proxy for 'breakpoint hit' alerts",
-                _ => d => d.Host.Connect(d.DebugClientPrx)),
-            new(new[] { "Continue", "g" }, "Resume execution", _ => d => d.Host.Continue()),
+                (_,  d) => d.Host.Connect(d.DebugClientPrx)),
+            new(new[] { "Continue", "g" }, "Resume execution", (_,  d) => d.Host.Continue()),
 
             // TODO
-            new(new[] { "Break", "b" }, "Pause execution", _ => d => UpdateRegisters(d.Host.Break(), d)),
-            new(new[] { "StepOver", "p" }, "Steps to the next instruction, ignoring function calls / interrupts etc", _ => d => { }),
-            new(new[] { "StepIn", "n" }, "Steps to the next instruction, including into function calls etc", _ => d => UpdateRegisters(d.Host.StepIn(), d)),
-            new(new[] { "StepMultiple", "gn" }, "Runs the CPU for the given number of cycles", getArg => d =>
+            new(new[] { "Break", "b" }, "Pause execution", (_,  d) => UpdateRegisters(d.Host.Break(), d)),
+            new(new[] { "StepOver", "p" }, "Steps to the next instruction, ignoring function calls / interrupts etc", (_,  _) => { }),
+            new(new[] { "StepIn", "n" }, "Steps to the next instruction, including into function calls etc", (_,  d) => UpdateRegisters(d.Host.StepIn(), d)),
+            new(new[] { "StepMultiple", "gn" }, "Runs the CPU for the given number of cycles", (getArg, d) =>
             {
                 var n = ParseVal(getArg());
                 UpdateRegisters(d.Host.StepMultiple(n), d);
             }),
-            new(new[] { "StepOut", "go" }, "Run until the current function returns", _ => d => { }),
-            new(new[] { "RunToCall", "gc" }, "Run until the next 'call' instruction is encountered", _ => d => { }),
+            new(new[] { "StepOut", "go" }, "Run until the current function returns", (_,  _) => { }),
+            new(new[] { "RunToCall", "gc" }, "Run until the next 'call' instruction is encountered", (_,  _) => { }),
 
-            new(new[] { "RunToAddress", "ga" }, "Run until the given address is reached", getArg => d =>
+            new(new[] { "RunToAddress", "ga" }, "Run until the given address is reached", (getArg,  d) =>
             {
-                var address = ParseAddress(getArg());
+                var address = ParseAddress(getArg(), d, true);
                 d.Host.RunToAddress(address);
             }),
 
-            new(new[] { "GetState", "r" }, "Get the current CPU state", _ => d => UpdateRegisters(d.Host.GetState(), d)),
-            new(new[] { "Disassemble", "u" }, "Disassemble instructions at the given address", getArg => d =>
+            new(new[] { "GetState", "r" }, "Get the current CPU state", (_,  d) => UpdateRegisters(d.Host.GetState(), d)),
+            new(new[] { "Disassemble", "u" }, "Disassemble instructions at the given address", (getArg,  d) =>
             {
-                var address = ParseAddress(getArg());
+                var address = ParseAddress(getArg(), d, true);
                 var length = ParseVal(getArg());
                 PrintAsm(d.Host.Disassemble(address, length), d.Log);
             }),
 
-            new(new[] { "GetMemory", "d" }, "Gets the contents of memory at the given address", getArg => d =>
+            new(new[] { "GetMemory", "d" }, "Gets the contents of memory at the given address", (getArg,  d) =>
             {
-                var address = ParseAddress(getArg());
+                var address = ParseAddress(getArg(), d, false);
                 var length = ParseVal(getArg());
                 PrintBytes(d.Host.GetMemory(address, length), d.Log);
             }),
-            new(new[] { "SetMemory", "e" }, "Changes the contents of memory at the given address", getArg => d =>
+            new(new[] { "SetMemory", "e" }, "Changes the contents of memory at the given address", (getArg,  d) =>
             {
-                var address = ParseAddress(getArg());
+                var address = ParseAddress(getArg(), d, false);
                 var value = ParseVal(getArg());
                 var bytes = BitConverter.GetBytes(value);
                 d.Host.SetMemory(address, bytes);
             }),
 
-            new(new[] { "ListBreakpoints", "bps", "bl" }, "Retrieves the current breakpoint list", _ => d => PrintBps(d.Host.ListBreakpoints(), d.Log)),
-            new(new[] { "SetBreakpoint", "bp" }, "<address> [type] [ah] [al] - Sets or updates a breakpoint", getArg => d =>
+            new(new[] { "ListBreakpoints", "bps", "bl" }, "Retrieves the current breakpoint list", (_,  d) => PrintBps(d.Host.ListBreakpoints(), d.Log)),
+            new(new[] { "SetBreakpoint", "bp" }, "<address> [type] [ah] [al] - Sets or updates a breakpoint", (getArg,  d) =>
             {
-                var address = ParseAddress(getArg());
+                var address = ParseAddress(getArg(), d, true);
                 var s = getArg();
                 var type = s == "" ? BreakpointType.Normal : ParseBpType(getArg());
 
@@ -203,17 +270,27 @@ static class CommandParser
                 d.Host.SetBreakpoint(bp);
             }),
 
-            new(new[] { "DelBreakpoint", "bd" }, "Removes the breakpoint at the given address", getArg => d =>
+            new(new[] { "DelBreakpoint", "bd" }, "Removes the breakpoint at the given address", (getArg,  d) =>
             {
-                var addr = ParseAddress(getArg());
+                var addr = ParseAddress(getArg(), d, true);
                 d.Host.DelBreakpoint(addr);
             }),
 
-            new(new[] { "SetReg", "reg" }, "Updates the contents of a CPU register", getArg => d =>
+            new(new[] { "SetReg", "reg" }, "Updates the contents of a CPU register", (getArg,  d) =>
             {
                 Register reg = ParseReg(getArg());
                 int value = ParseVal(getArg());
                 d.Host.SetReg(reg, value);
+            }),
+
+            new(new[] { "GetGDT", "gdt"}, "Retrieves the Global Descriptor Table", (getArg, d) =>
+            {
+                PrintDescriptors(d.Host.GetGdt(), false, d.Log);
+            }),
+
+            new(new[] { "GetLDT", "ldt"}, "Retrieves the Local Descriptor Table", (getArg, d) =>
+            {
+                PrintDescriptors(d.Host.GetLdt(), true, d.Log);
             })
         }.SelectMany(x => x.Names.Select(name => (name, x)))
         .ToDictionary(x => x.name.ToUpperInvariant(), x => x.x);
@@ -231,8 +308,7 @@ static class CommandParser
             if (Commands.TryGetValue(name, out var command))
             {
                 int curArg = 1;
-                var func = command.BuildCommand(() => curArg >= parts.Length ? "" : parts[curArg++]);
-                func(d);
+                command.Func(() => curArg >= parts.Length ? "" : parts[curArg++], d);
             }
             else d.Log.Error($"Unknown command \"{parts[0]}\"");
         }
