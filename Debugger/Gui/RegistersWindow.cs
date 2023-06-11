@@ -1,7 +1,7 @@
 ﻿using System.Numerics;
 using ImGuiNET;
 
-namespace DosboxDebugger;
+namespace DosboxDebugger.Gui;
 
 class RegistersWindow : IImGuiWindow
 {
@@ -22,7 +22,7 @@ class RegistersWindow : IImGuiWindow
     Vector2 _flagTxtSize;
     Vector2 _flagChildSize;
 
-    public RegistersWindow(Debugger debugger) 
+    public RegistersWindow(Debugger debugger)
         => _debugger = debugger ?? throw new ArgumentNullException(nameof(debugger));
 
     public void Open() => _open = true;
@@ -86,9 +86,9 @@ class RegistersWindow : IImGuiWindow
 
         ImGui.PushStyleColor(ImGuiCol.Border, Yellow);
         ImGui.BeginChild("segments", _segChildSize, true, ImGuiWindowFlags.NoScrollbar);
-        DrawReg4("DS",regs.ds, oldRegs.ds); ImGui.SameLine(); DrawReg4("FS",regs.fs, oldRegs.fs);
-        DrawReg4("ES",regs.es, oldRegs.es); ImGui.SameLine(); DrawReg4("GS",regs.gs, oldRegs.gs);
-        DrawReg4("CS",regs.cs, oldRegs.cs); ImGui.SameLine(); DrawReg4("SS",regs.ss, oldRegs.ss);
+        DrawReg4("DS", regs.ds, oldRegs.ds); ImGui.SameLine(); DrawReg4("FS", regs.fs, oldRegs.fs);
+        DrawReg4("ES", regs.es, oldRegs.es); ImGui.SameLine(); DrawReg4("GS", regs.gs, oldRegs.gs);
+        DrawReg4("CS", regs.cs, oldRegs.cs); ImGui.SameLine(); DrawReg4("SS", regs.ss, oldRegs.ss);
         ImGui.EndChild();
         ImGui.PopStyleColor();
 
@@ -140,9 +140,9 @@ class RegistersWindow : IImGuiWindow
 
     static void DrawFlag(string name, int flags, int oldFlags, CpuFlags flag)
     {
-        int val    = (flags    & (int)flag) == 0 ? 0 : 1;
+        int val = (flags & (int)flag) == 0 ? 0 : 1;
         int oldVal = (oldFlags & (int)flag) == 0 ? 0 : 1;
-        var color  = val == oldVal ? White : Red;
+        var color = val == oldVal ? White : Red;
         ImGui.TextColored(color, $"{name}={val}");
     }
 

@@ -178,21 +178,20 @@ static auto histBuffPos = histBuff.end();
 /* Helpers */
 /***********/
 
-uint32_t PhysMakeProt(uint16_t selector, uint32_t offset)
-{
-	Descriptor desc;
-	if (cpu.gdt.GetDescriptor(selector,desc)) return desc.GetBase()+offset;
-	return 0;
-}
-
 uint32_t GetAddress(uint16_t seg, uint32_t offset)
 {
-	if (seg==SegValue(cs)) return SegPhys(cs)+offset;
+	if (seg == SegValue(cs)) {
+		return SegPhys(cs) + offset;
+	}
+
 	if (cpu.pmode && !(reg_flags & FLAG_VM)) {
 		Descriptor desc;
-		if (cpu.gdt.GetDescriptor(seg,desc)) return PhysMakeProt(seg,offset);
+		if (cpu.gdt.GetDescriptor(seg, desc)) {
+			return desc.GetBase() + offset;
+		}
 	}
-	return (seg<<4)+offset;
+
+	return (seg << 4) + offset;
 }
 
 static char empty_sel[] = { ' ',' ',0 };

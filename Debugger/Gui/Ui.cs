@@ -4,7 +4,7 @@ using Veldrid;
 using Veldrid.Sdl2;
 using Veldrid.StartupUtilities;
 
-namespace DosboxDebugger;
+namespace DosboxDebugger.Gui;
 
 class Ui : IDisposable
 {
@@ -69,7 +69,7 @@ class Ui : IDisposable
             _imguiRenderer.Update(1f / 60f, input);
 
             if (!ImGui.BeginMainMenuBar())
-                 return;
+                return;
 
             foreach (var menu in _menus)
                 menu();

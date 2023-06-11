@@ -11,7 +11,7 @@ module DosboxDebugger
 	}
 
 	struct Registers {
-		// CPU state? FPU?
+		bool stopped;
 		int flags;
 
 		int eax; int ebx; int ecx; int edx;
@@ -148,6 +148,7 @@ module DosboxDebugger
 	}
 
 	sequence<Descriptor> Descriptors;
+	sequence<Address> Addresses;
 
     interface DebugHost
     {
@@ -158,6 +159,8 @@ module DosboxDebugger
 		Registers StepMultiple(int cycles);
 		void RunToAddress(Address address);
 		Registers GetState();
+		int GetMaxNonEmptyAddress(short seg);
+		Addresses SearchMemory(Address start, int length, ByteSequence pattern, int advance);
 
 		AssemblySequence Disassemble(Address address, int length);
 		ByteSequence GetMemory(Address address, int length);

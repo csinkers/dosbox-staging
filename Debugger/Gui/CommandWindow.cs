@@ -1,33 +1,54 @@
 ﻿using System.Numerics;
 using System.Text;
+using ImGuiColorTextEditNet;
 using ImGuiNET;
 
-namespace DosboxDebugger;
+namespace DosboxDebugger.Gui;
 
-class CommandWindow : IImGuiWindow
+public class CommandWindow : SingletonWindow
 {
     readonly Debugger _debugger;
     readonly LogHistory _history;
     readonly byte[] _inputBuffer = new byte[512]; // TODO: Initial size
+    readonly TextEditor _textEditor = new();
     bool _autoScroll = true;
     bool _scrollToBottom = true;
     bool _focus;
-    bool _open = true;
 
-    public CommandWindow(Debugger debugger, LogHistory history)
+    const PaletteIndex ErrorColor = PaletteIndex.Custom;
+    const PaletteIndex WarningColor = PaletteIndex.Custom + 1;
+    const PaletteIndex InfoColor = PaletteIndex.Custom + 2;
+    const PaletteIndex DebugColor = PaletteIndex.Custom + 3;
+
+    public CommandWindow(Debugger debugger, LogHistory history) : base("Command")
     {
         _debugger = debugger ?? throw new ArgumentNullException(nameof(debugger));
         _history = history ?? throw new ArgumentNullException(nameof(history));
+        _textEditor.Options.IsReadOnly = true;
+        _textEditor.SetColor(ErrorColor, 0xff0000ff);
+        _textEditor.SetColor(WarningColor, 0xff00ffff);
+        _textEditor.SetColor(InfoColor, 0xffffffff);
+        _textEditor.SetColor(DebugColor, 0xffc0c0c0);
+
+        _history.EntryAdded += x =>
+        {
+            var color = x.Severity switch
+            {
+                Severity.Info => InfoColor,
+                Severity.Warn => WarningColor,
+                Severity.Error => ErrorColor,
+                _ => DebugColor
+            };
+
+            _textEditor.AppendLine(x.Line, color);
+            _textEditor.ScrollToEnd();
+        };
+
+        _history.Cleared += () => _textEditor.AllText = "";
     }
 
-    public void Open() => _open = true;
-
-    public void Draw()
+    protected override void DrawContents()
     {
-        if (!_open)
-            return;
-
-        ImGui.Begin("Command", ref _open);
         ImGui.SetWindowPos(Vector2.Zero, ImGuiCond.FirstUseEver);
 
         // Reserve enough left-over height for 1 separator + 1 input text
@@ -40,17 +61,9 @@ class CommandWindow : IImGuiWindow
 
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(4, 1)); // Tighten spacing
 
-        _history.Access(0, (_, logs) =>
-        {
-            foreach (var log in logs)
-            {
-                ImGui.PushStyleColor(ImGuiCol.Text, log.Color);
-                ImGui.TextUnformatted(log.Line);
-                ImGui.PopStyleColor();
-            }
-        });
+        _textEditor.Render("Log");
 
-        if (_scrollToBottom || (_autoScroll && ImGui.GetScrollY() >= ImGui.GetScrollMaxY()))
+        if (_scrollToBottom || _autoScroll && ImGui.GetScrollY() >= ImGui.GetScrollMaxY())
             ImGui.SetScrollHereY(1.0f);
         _scrollToBottom = false;
 
@@ -75,6 +88,7 @@ class CommandWindow : IImGuiWindow
             for (int i = 0; i < command.Length; i++)
                 _inputBuffer[i] = 0;
 
+            _history.Add("> " + command, Severity.Info);
             CommandParser.RunCommand(command, _debugger);
             reclaimFocus = true;
         }
@@ -85,7 +99,5 @@ class CommandWindow : IImGuiWindow
 
         ImGui.SameLine();
         ImGui.Checkbox("Scroll", ref _autoScroll);
-
-        ImGui.End();
     }
 }

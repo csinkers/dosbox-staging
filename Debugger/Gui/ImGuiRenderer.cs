@@ -3,7 +3,7 @@ using System.Reflection;
 using ImGuiNET;
 using Veldrid;
 
-namespace DosboxDebugger;
+namespace DosboxDebugger.Gui;
 
 public sealed class ImGuiRenderer : IDisposable // This is largely based on Veldrid.ImGuiRenderer from Veldrid.ImGui
 {
@@ -548,8 +548,8 @@ public sealed class ImGuiRenderer : IDisposable // This is largely based on Veld
                 if (pcmd.TextureId != IntPtr.Zero)
                 {
                     cl.SetGraphicsResourceSet(1,
-                        pcmd.TextureId == _fontAtlasId 
-                            ? _fontTextureResourceSet 
+                        pcmd.TextureId == _fontAtlasId
+                            ? _fontTextureResourceSet
                             : GetImageResourceSet(pcmd.TextureId));
                 }
 

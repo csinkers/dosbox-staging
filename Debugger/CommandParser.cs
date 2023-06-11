@@ -5,79 +5,6 @@ namespace DosboxDebugger;
 
 static class CommandParser
 {
-    static uint ParseOffset(string s, Debugger d, out int segmentHint)
-    {
-        segmentHint = 0;
-        if (!uint.TryParse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var offset))
-        {
-            var upper = s.ToUpperInvariant();
-            switch (upper)
-            {
-                case "EAX": segmentHint = d.Registers.ds; return (uint)d.Registers.eax;
-                case "EBX": segmentHint = d.Registers.ds; return (uint)d.Registers.ebx;
-                case "ECX": segmentHint = d.Registers.ds; return (uint)d.Registers.ecx;
-                case "EDX": segmentHint = d.Registers.ds; return (uint)d.Registers.edx;
-                case "ESI": segmentHint = d.Registers.ds; return (uint)d.Registers.esi;
-                case "EDI": segmentHint = d.Registers.ds; return (uint)d.Registers.edi;
-                case "EBP": segmentHint = d.Registers.ss; return (uint)d.Registers.ebp;
-                case "ESP": segmentHint = d.Registers.ss; return (uint)d.Registers.esp;
-                case "EIP": segmentHint = d.Registers.cs; return (uint)d.Registers.eip;
-            }
-
-            if (!d.TryFindSymbol(s, out offset))
-                throw new FormatException($"Could not resolve an address for \"{s}\"");
-        }
-
-        return offset;
-    }
-
-    static Address ParseAddress(string s, Debugger d, bool code)
-    {
-        int index = s.IndexOf(':');
-        uint offset;
-        int segment;
-
-        if (index == -1)
-        {
-            offset = ParseOffset(s, d, out segment);
-            if (segment == 0)
-                segment = code ? d.Registers.cs : d.Registers.ds;
-        }
-        else
-        {
-            var part = s[..index];
-            if (!int.TryParse(part, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out segment))
-            {
-                segment = part.ToUpperInvariant() switch
-                {
-                    "CS" => d.Registers.cs,
-                    "DS" => d.Registers.ds,
-                    "SS" => d.Registers.ss,
-                    "ES" => d.Registers.es,
-                    "FS" => d.Registers.fs,
-                    "GS" => d.Registers.gs,
-                    _ => throw new FormatException($"Invalid segment \"{part}\"")
-                };
-            }
-
-            offset = ParseOffset(s[(index+1)..], d, out _);
-        }
-
-        var signedOffset = unchecked((int)offset);
-        return new Address(unchecked((short)segment), signedOffset);
-    }
-
-    static int ParseVal(string s)
-    {
-        if (s.StartsWith("0x"))
-            return int.Parse(s[2..], NumberStyles.HexNumber);
-
-        if (s.StartsWith("0"))
-            return int.Parse(s[1..], NumberStyles.HexNumber);
-
-        return int.Parse(s);
-    }
-
     static void PrintAsm(AssemblyLine[] lines, ITracer log)
     {
         foreach (var line in lines)
@@ -87,15 +14,16 @@ static class CommandParser
     static void PrintBytes(Address address, byte[] bytes, ITracer log)
     {
         const string hexChars = "0123456789ABCDEF";
-        var result = new StringBuilder(bytes.Length * 2);
+        var result = new StringBuilder(128);
         var chars = new StringBuilder(16);
         for (var i = 0; i < bytes.Length; i++)
         {
             if (i % 16 == 0)
             {
                 result.Append(chars);
+                log.Debug(result.ToString());
+                result.Clear();
                 chars.Clear();
-                result.AppendLine();
                 result.Append($"{address.segment:X}:{address.offset + i:X8}: ");
             }
 
@@ -111,7 +39,8 @@ static class CommandParser
         if (chars.Length > 0)
             result.Append(chars);
 
-        log.Debug(result.ToString());
+        if (result.Length > 0)
+            log.Debug(result.ToString());
     }
 
     static void PrintBps(Breakpoint[] breakpoints, ITracer log)
@@ -122,7 +51,7 @@ static class CommandParser
 
     static void PrintDescriptors(Descriptor[] descriptors, bool ldt, ITracer log)
     {
-        for(int i = 0; i < descriptors.Length; i++)
+        for (int i = 0; i < descriptors.Length; i++)
         {
             var descriptor = descriptors[i];
             switch (descriptor.type)
@@ -152,49 +81,9 @@ static class CommandParser
         }
     }
 
-    static Register ParseReg(string s) =>
-        s.ToUpperInvariant() switch
-        {
-            "Flags" => Register.Flags,
-            "EAX" => Register.EAX,
-            "EBX" => Register.EBX,
-            "ECX" => Register.ECX,
-            "EDX" => Register.EDX,
-            "ESI" => Register.ESI,
-            "EDI" => Register.EDI,
-            "EBP" => Register.EBP,
-            "ESP" => Register.ESP,
-            "EIP" => Register.EIP,
-            "ES" => Register.ES,
-            "CS" => Register.CS,
-            "SS" => Register.SS,
-            "DS" => Register.DS,
-            "FS" => Register.FS,
-            "GS" => Register.GS,
-            _ => throw new FormatException($"Unexpected register \"{s}\"")
-        };
-
-    static BreakpointType ParseBpType(string s) =>
-        s.ToUpperInvariant() switch
-        {
-            "NORMAL" => BreakpointType.Normal,
-            "N" => BreakpointType.Normal,
-            "X" => BreakpointType.Normal,
-            "READ" => BreakpointType.Read,
-            "R" => BreakpointType.Read,
-            "WRITE" => BreakpointType.Write,
-            "W" => BreakpointType.Write,
-            "INTERRUPT" => BreakpointType.Interrupt,
-            "INT" => BreakpointType.Interrupt,
-            "INTERRUPTWITHAH" => BreakpointType.InterruptWithAH,
-            "INTAH" => BreakpointType.InterruptWithAH,
-            "INTAL" => BreakpointType.InterruptWithAX,
-            _ => throw new FormatException($"Unexpected breakpoint type \"{s}\"")
-        };
-
     static void UpdateRegisters(Registers reg, Debugger d)
     {
-        d.Registers = reg;
+        d.Update(reg);
         var flagsSb = new StringBuilder();
         var flags = (CpuFlags)reg.flags;
         if ((flags & CpuFlags.CF) != 0) flagsSb.Append(" C");
@@ -235,27 +124,37 @@ static class CommandParser
                     d.Log.Debug($"{names}{pad}: {cmd.Description}");
                 }
             }),
-            new(new []  { "clear", "cls" }, "Clear the log history", (_,  d) => d.Log.Clear()),
+            new(new []  { "clear", "cls", ".cls" }, "Clear the log history", (_,  d) => d.Log.Clear()),
 
             new(new[] { "Connect", "!" }, "Register the callback proxy for 'breakpoint hit' alerts",
                 (_,  d) => d.Host.Connect(d.DebugClientPrx)),
+
             new(new[] { "Continue", "g" }, "Resume execution", (_,  d) => d.Host.Continue()),
 
             // TODO
             new(new[] { "Break", "b" }, "Pause execution", (_,  d) => UpdateRegisters(d.Host.Break(), d)),
-            new(new[] { "StepOver", "p" }, "Steps to the next instruction, ignoring function calls / interrupts etc", (_,  _) => { }),
+            new(new[] { "StepOver", "p" }, "Steps to the next instruction, ignoring function calls / interrupts etc", (_, d) =>
+            {
+                // TODO
+            }),
             new(new[] { "StepIn", "n" }, "Steps to the next instruction, including into function calls etc", (_,  d) => UpdateRegisters(d.Host.StepIn(), d)),
             new(new[] { "StepMultiple", "gn" }, "Runs the CPU for the given number of cycles", (getArg, d) =>
             {
-                var n = ParseVal(getArg());
+                var n = ParseUtil.ParseVal(getArg());
                 UpdateRegisters(d.Host.StepMultiple(n), d);
             }),
-            new(new[] { "StepOut", "go" }, "Run until the current function returns", (_,  _) => { }),
-            new(new[] { "RunToCall", "gc" }, "Run until the next 'call' instruction is encountered", (_,  _) => { }),
+            new(new[] { "StepOut", "go" }, "Run until the current function returns", (_, _) =>
+            {
+                // TODO
+            }),
+            new(new[] { "RunToCall", "gc" }, "Run until the next 'call' instruction is encountered", (_,  _) =>
+            {
+                // TODO
+             }),
 
             new(new[] { "RunToAddress", "ga" }, "Run until the given address is reached", (getArg,  d) =>
             {
-                var address = ParseAddress(getArg(), d, true);
+                var address = ParseUtil.ParseAddress(getArg(), d, true);
                 d.Host.RunToAddress(address);
             }),
 
@@ -263,48 +162,148 @@ static class CommandParser
             new(new[] { "Disassemble", "u" }, "Disassemble instructions at the given address", (getArg,  d) =>
             {
                 var addressArg = getArg();
-                var address = addressArg == "" 
+                var address = addressArg == ""
                     ? new Address(d.Registers.cs, d.Registers.eip)
-                    : ParseAddress(addressArg, d, true);
+                    : ParseUtil.ParseAddress(addressArg, d, true);
 
                 var lengthArg = getArg();
                 var length = addressArg == "" || lengthArg == ""
                     ? 10
-                    : ParseVal(lengthArg);
+                    : ParseUtil.ParseVal(lengthArg);
 
                 PrintAsm(d.Host.Disassemble(address, length), d.Log);
             }),
 
-            new(new[] { "GetMemory", "d" }, "Gets the contents of memory at the given address", (getArg,  d) =>
+            new(new[] { "GetMemory", "d", "dc" }, "Gets the contents of memory at the given address", (getArg,  d) =>
             {
-                var address = ParseAddress(getArg(), d, false);
+                var address = ParseUtil.ParseAddress(getArg(), d, false);
                 var lengthArg = getArg();
                 var length = lengthArg == ""
                     ? 64
-                    : ParseVal(lengthArg);
+                    : ParseUtil.ParseVal(lengthArg);
 
                 PrintBytes(address, d.Host.GetMemory(address, length), d.Log);
             }),
+
             new(new[] { "SetMemory", "e" }, "Changes the contents of memory at the given address", (getArg,  d) =>
             {
-                var address = ParseAddress(getArg(), d, false);
-                var value = ParseVal(getArg());
+                var address = ParseUtil.ParseAddress(getArg(), d, false);
+                var value = ParseUtil.ParseVal(getArg());
                 var bytes = BitConverter.GetBytes(value);
                 d.Host.SetMemory(address, bytes);
+            }),
+
+            new(new[] { "GetMaxAddress" }, "Gets the maximum address that has been used in the given segment", (getArg,  d) =>
+            {
+                var segString = getArg();
+                if (!ParseUtil.TryParseSegment(segString, d, out var segment))
+                {
+                    d.Log.Error($"Could not parse \"{segString}\" as a segment");
+                    return;
+                }
+
+                int maxAddress = d.Host.GetMaxNonEmptyAddress(segment);
+                d.Log.Info($"MaxAddress: 0x{(uint)maxAddress:X8}");
+            }),
+
+            new(new[] { "Search", "s" }, "Searches for occurrences of a byte pattern in a memory range (e.g. \"s 0 -1 24 3a 99\"", (getArg,  d) =>
+            {
+                var address = ParseUtil.ParseAddress(getArg(), d, false);
+                var length = ParseUtil.ParseVal(getArg());
+                var pattern = new List<byte>();
+
+                string arg;
+                while (!string.IsNullOrEmpty(arg = getArg()))
+                {
+                    if (!byte.TryParse(arg, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var b))
+                    {
+                        d.Log.Error($"Could not parse \"{arg}\" as a hex byte");
+                        return;
+                    }
+
+                    pattern.Add(b);
+                }
+
+                var results = d.Host.SearchMemory(address, length, pattern.ToArray(), 1);
+                int displayLength = 16 * ((pattern.Count + 15) / 16);
+                foreach (var result in results)
+                    PrintBytes(result, d.Host.GetMemory(result, displayLength), d.Log);
+            }),
+
+            new(new[] { "SearchDwords", "s-d" }, "Searches for occurrences of one or more little-endian dwords in a memory range (e.g. \"s 0 -1 badf00d 12341234\")", (getArg,  d) =>
+            {
+                var address = ParseUtil.ParseAddress(getArg(), d, false);
+                var length = ParseUtil.ParseVal(getArg());
+                var pattern = new List<byte>();
+
+                string arg;
+                while (!string.IsNullOrEmpty(arg = getArg()))
+                {
+                    if (!uint.TryParse(arg, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var dword))
+                    {
+                        d.Log.Error($"Could not parse \"{arg}\" as a hex byte");
+                        return;
+                    }
+
+                    pattern.Add((byte)(dword & 0xff));
+                    pattern.Add((byte)((dword >> 8)  & 0xff));
+                    pattern.Add((byte)((dword >> 16) & 0xff));
+                    pattern.Add((byte)((dword >> 24) & 0xff));
+                }
+
+                var results = d.Host.SearchMemory(address, length, pattern.ToArray(), 4);
+                int displayLength = 16 * ((pattern.Count + 15) / 16);
+                foreach (var result in results)
+                    PrintBytes(result, d.Host.GetMemory(result, displayLength), d.Log);
+            }),
+
+            new(new[] { "SearchAscii", "s-a" }, "Searches for occurrences of an ASCII pattern in a memory range (e.g. \"s-a 0 -1 test\"", (getArg,  d) =>
+            {
+                var address = ParseUtil.ParseAddress(getArg(), d, false);
+                var length = ParseUtil.ParseVal(getArg());
+
+                string pattern = getArg();
+                if (string.IsNullOrEmpty(pattern))
+                    return;
+
+                var bytes = Encoding.ASCII.GetBytes(pattern);
+
+                var results = d.Host.SearchMemory(address, length, bytes, 1);
+                int displayLength = 16 * ((pattern.Length + 15) / 16);
+                foreach (var result in results)
+                    PrintBytes(result, d.Host.GetMemory(result, displayLength), d.Log);
+            }),
+
+            new(new[] { ".dumpmem" }, "Dumps a section of memory to a local file", (getArg, d) =>
+            {
+                var filename = getArg();
+                if (!Directory.Exists(Path.GetDirectoryName(filename)))
+                    throw new DirectoryNotFoundException("The directory could not be found");
+
+                var address = ParseUtil.ParseAddress(getArg(), d, false);
+                var lengthArg = getArg();
+                var length = lengthArg == ""
+                    ? 64
+                    : ParseUtil.ParseVal(lengthArg);
+
+                var bytes = d.Host.GetMemory(address, length);
+
+                if (bytes != null)
+                    File.WriteAllBytes(filename, bytes);
             }),
 
             new(new[] { "ListBreakpoints", "bps", "bl" }, "Retrieves the current breakpoint list", (_,  d) => PrintBps(d.Host.ListBreakpoints(), d.Log)),
             new(new[] { "SetBreakpoint", "bp" }, "<address> [type] [ah] [al] - Sets or updates a breakpoint", (getArg,  d) =>
             {
-                var address = ParseAddress(getArg(), d, true);
+                var address = ParseUtil.ParseAddress(getArg(), d, true);
                 var s = getArg();
-                var type = s == "" ? BreakpointType.Normal : ParseBpType(getArg());
+                var type = s == "" ? BreakpointType.Normal : ParseUtil.ParseBpType(getArg());
 
                 s = getArg();
-                byte ah = s == "" ? (byte)0 : (byte)ParseVal(s);
+                byte ah = s == "" ? (byte)0 : (byte)ParseUtil.ParseVal(s);
 
                 s = getArg();
-                byte al = s == "" ? (byte)0 : (byte)ParseVal(s);
+                byte al = s == "" ? (byte)0 : (byte)ParseUtil.ParseVal(s);
 
                 var bp = new Breakpoint(address, type, ah, al);
                 d.Host.SetBreakpoint(bp);
@@ -312,14 +311,14 @@ static class CommandParser
 
             new(new[] { "DelBreakpoint", "bd" }, "Removes the breakpoint at the given address", (getArg,  d) =>
             {
-                var addr = ParseAddress(getArg(), d, true);
+                var addr = ParseUtil.ParseAddress(getArg(), d, true);
                 d.Host.DelBreakpoint(addr);
             }),
 
             new(new[] { "SetReg", "reg" }, "Updates the contents of a CPU register", (getArg,  d) =>
             {
-                Register reg = ParseReg(getArg());
-                int value = ParseVal(getArg());
+                Register reg = ParseUtil.ParseReg(getArg());
+                int value = ParseUtil.ParseVal(getArg());
                 d.Host.SetReg(reg, value);
             }),
 
@@ -335,6 +334,46 @@ static class CommandParser
         }.SelectMany(x => x.Names.Select(name => (name, x)))
         .ToDictionary(x => x.name.ToUpperInvariant(), x => x.x);
 
+    static List<string> SplitArgs(string line)
+    {
+        var results = new List<string>();
+        var sb = new StringBuilder();
+        bool inQuotes = false;
+        foreach (var c in line)
+        {
+            switch (c)
+            {
+                case '"' when inQuotes:
+                    inQuotes = false;
+                    if (sb.Length > 0)
+                    {
+                        results.Add(sb.ToString());
+                        sb.Clear();
+                    }
+                    break;
+
+                case '"': inQuotes = true; break;
+                case ' ' when inQuotes: sb.Append(c); break;
+                case ' ':
+                    if (sb.Length > 0)
+                    {
+                        results.Add(sb.ToString());
+                        sb.Clear();
+                    }
+                    break;
+
+                default:
+                    sb.Append(c);
+                    break;
+            }
+        }
+
+        if (sb.Length > 0)
+            results.Add(sb.ToString());
+
+        return results;
+    }
+
     public static void RunCommand(string line, Debugger d)
     {
         try
@@ -342,13 +381,13 @@ static class CommandParser
             if (string.IsNullOrWhiteSpace(line))
                 return;
 
-            var parts = line.Split(' ');
+            var parts = SplitArgs(line); //line.Split(' ');
             var name = parts[0].ToUpperInvariant();
 
             if (Commands.TryGetValue(name, out var command))
             {
                 int curArg = 1;
-                command.Func(() => curArg >= parts.Length ? "" : parts[curArg++], d);
+                command.Func(() => curArg >= parts.Count ? "" : parts[curArg++], d);
             }
             else d.Log.Error($"Unknown command \"{parts[0]}\"");
         }

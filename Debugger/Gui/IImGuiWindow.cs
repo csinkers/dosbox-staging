@@ -1,4 +1,4 @@
-﻿namespace DosboxDebugger;
+﻿namespace DosboxDebugger.Gui;
 
 public interface IImGuiWindow
 {

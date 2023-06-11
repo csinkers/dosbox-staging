@@ -5,6 +5,8 @@ public delegate void StoppedDelegate(Registers state);
 public class Debugger
 {
     Registers _registers;
+    long _version;
+
     public ITracer Log { get; }
     public DebugHostPrx Host { get; }
     public DebugClientPrx DebugClientPrx { get; }
@@ -12,7 +14,7 @@ public class Debugger
     public Registers Registers
     {
         get => _registers;
-        set { OldRegisters = _registers; _registers = value; }
+        private set { OldRegisters = _registers; _registers = value; }
     }
 
     public MemoryCache Memory { get; } = new();
@@ -20,7 +22,7 @@ public class Debugger
     public Debugger(IceSession ice, ITracer log)
     {
         Log = log ?? throw new ArgumentNullException(nameof(log));
-        ice.Client.StoppedEvent += OnStopped;
+        ice.Client.StoppedEvent += Update;
         Host = ice.DebugHost;
         DebugClientPrx = ice.ClientProxy;
     }
@@ -31,8 +33,10 @@ public class Debugger
         return false;
     }
 
-    void OnStopped(Registers state)
+    public void Update(Registers state)
     {
-        Console.WriteLine(" -> Stopped");
+        Registers = state;
+        _version++;
     }
 }
+

@@ -11,8 +11,11 @@
 
 using namespace std;
 
+static bool IsStopped() { return DOSBOX_GetLoop() == DEBUG_Loop; }
+
 static void GetRegisters(DosboxDebugger::Registers& result)
 {
+	result.stopped = IsStopped();
 	result.flags = (int)reg_flags;
 	result.eax   = (int)reg_eax;
 	result.ebx   = (int)reg_ebx;
@@ -264,6 +267,112 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 				mem_writeb_checked(physAddr, bytes[x]);
 			}
 		});
+	}
+
+	int GetMaxNonEmptyAddress(short seg, const Ice::Current& current) override
+	{
+		Descriptor desc;
+		if (!cpu.gdt.GetDescriptor(seg, desc)) 
+			return 0;
+
+		PhysPt minPage     = desc.GetBase() >> 12;
+		PhysPt maxPhysAddr = desc.GetBase() + desc.GetLimit();
+		PhysPt maxPage     = maxPhysAddr >> 12;
+
+		for (PhysPt i = maxPage; i >= minPage; i--) {
+			if (paging.tlb.read[i] != nullptr) {
+				PhysPt maxPhysAddr = (i << 12) + 0xfff;
+				PhysPt segmentRelative = maxPhysAddr - desc.GetBase();
+				return (int)segmentRelative;
+			}
+
+			if (i == 0) {
+				break;
+			}
+		}
+
+		return 0;
+	}
+
+	DosboxDebugger::Addresses SearchMemory(
+		DosboxDebugger::Address start,
+		int length,
+		DosboxDebugger::ByteSequence pattern,
+		int advance,
+		const Ice::Current& current) override
+	{
+		DosboxDebugger::Addresses results;
+		if (pattern.empty())
+			return results;
+
+		if (advance == 0)
+			advance = (int)pattern.size();
+
+		if (length == -1) {
+			PhysPt maxAddr = (PhysPt)GetMaxNonEmptyAddress(start.segment, current);
+			length = (int)(maxAddr - start.offset);
+		}
+
+		Descriptor desc;
+		if (!cpu.gdt.GetDescriptor(start.segment, desc)) 
+			return results;
+
+		PhysPt maxPhysAddr = desc.GetBase() + desc.GetLimit();
+		PhysPt p = desc.GetBase() + start.offset;
+		if (p > maxPhysAddr)
+			return results;
+
+		PhysPt endAddr = p + length;
+		if (endAddr > maxPhysAddr)
+			endAddr = maxPhysAddr;
+
+		while (p < endAddr) {
+			PhysPt pageNum = p >> 12;
+			HostPt page = paging.tlb.read[pageNum];
+			HostPt endPage = paging.tlb.read[(p + pattern.size() - 1) >> 12];
+
+			if (page == nullptr) {
+				while (p >> 12 == pageNum) {
+					p += advance;
+				}
+				continue;
+			}
+
+			if (page == endPage) {
+				for (PhysPt i = 0; i < pattern.size(); i++) {
+					const uint8_t val = page[p + i];
+					if (pattern[i] != val)
+						break;
+
+					if (i == pattern.size() - 1)
+					{
+						DosboxDebugger::Address result;
+						result.segment = start.segment;
+						result.offset  = (int)(p - desc.GetBase());
+						results.push_back(result);
+					}
+				}
+			} else {
+				for (PhysPt i = 0; i < pattern.size(); i++) {
+					uint8_t val;
+					mem_readb_checked(p + i, &val);
+					if (pattern[i] != val)
+						break;
+
+					if (i == pattern.size() - 1)
+					{
+						DosboxDebugger::Address result;
+						result.segment = start.segment;
+						result.offset  = (int)(p - desc.GetBase());
+						results.push_back(result);
+					}
+				}
+			}
+
+			p += advance;
+		}
+		
+		return results;
 	}
 
 	DosboxDebugger::BreakpointSequence ListBreakpoints(const ::Ice::Current& current) override
