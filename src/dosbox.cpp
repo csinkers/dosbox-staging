@@ -819,6 +819,7 @@ void DOSBOX_Init()
 
 #if C_DEBUG
 	secprop = control->AddSection_prop("debug", &DEBUG_Init);
+	DEBUG_StartHost();
 #endif
 
 	secprop = control->AddSection_prop("sblaster",
