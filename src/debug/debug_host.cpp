@@ -583,8 +583,15 @@ static shared_ptr<Ice::Communicator> communicator;
 static void ServerThread()
 {
 	try {
-		Ice::CommunicatorHolder ich(Ice::InitializationData(), ICE_INT_VERSION);
+		Ice::PropertiesPtr properties = Ice::createProperties();
+		properties->setProperty("Ice.MessageSizeMax", "2097152");
+
+		Ice::InitializationData initData = Ice::InitializationData();
+		initData.properties = properties;
+
+		Ice::CommunicatorHolder ich(initData, ICE_INT_VERSION);
 		communicator = ich.communicator();
+
 		const auto adapter = ich->createObjectAdapterWithEndpoints("DebugHostAdapter",
 		                                                           "default -p 7243");
 		const auto servant = make_shared<DebugHostImpl>();
