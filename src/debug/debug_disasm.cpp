@@ -1,6 +1,6 @@
 
 /*
-	Ripped out some stuff from the mame releae to only make it for 386's 
+	Ripped out some stuff from the mame release to only make it for 386's 
 	Changed some variables to use the standard DOSBox data types 
 	Added my callback opcode 
 	
@@ -44,7 +44,7 @@ Comments:
 
 Health warning:
 
-   When writing and degbugging this code, I didn't have (and still don't have)
+   When writing and debugging this code, I didn't have (and still don't have)
    a 32-bit disassembler to compare this guy's output with.  It's therefore
    quite likely that bugs will appear when disassembling instructions which use
    the 386 and 486's native 32 bit mode.  It seems to work fine in 16 bit mode.
@@ -60,8 +60,8 @@ Any comments/updates/bug reports to:
    other items of software, then send me a post card of your home town.
 
    Thanks and enjoy!
-
 */
+
 #include "dosbox.h"
 #if C_DEBUG
 #include <stdio.h>
@@ -77,7 +77,6 @@ typedef uint32_t UINT32;
 typedef int8_t  INT8;
 typedef int16_t INT16;
 typedef int32_t INT32;
-
 
 /* Little endian uint read */
 #define	le_uint8(ptr) (*(UINT8*)ptr)
@@ -1076,7 +1075,6 @@ Bitu DasmI386(char* buffer, PhysPt pc, Bitu cur_ip, bool bit32)
 {
   	Bitu c;
 
-
 	instruction_offset = cur_ip;
 	/* input buffer */
 	startPtr	= pc;
@@ -1104,7 +1102,7 @@ Bitu DasmI386(char* buffer, PhysPt pc, Bitu cur_ip, bool bit32)
 		/* restart output buffer */
 		ubufp = buffer;
 		/* invalid instruction, use db xx */
-    		uprintf("db %02X", (unsigned)c);
+		uprintf("db %02X", (unsigned)c);
 		return 1;
 	}
 

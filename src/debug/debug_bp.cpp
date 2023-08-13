@@ -1,76 +1,107 @@
 #include "debug_internal.h"
 
-CBreakpoint::CBreakpoint(void)
-        : type(BKPNT_UNKNOWN),
-          location(0),
-          oldData(0xCC),
-          segment(0),
-          offset(0),
-          intNr(0),
-          ahValue(0),
-          alValue(0),
-          active(false),
-          once(false)
-{}
+static std::list<CBreakpoint*> BPoints = {}; // Must be kept sorted by id
+
+static int GetAvailableId()
+{
+	int newId = 0;
+	for (auto& it : BPoints) {
+		int id = it->GetId();
+		if (id == newId) {
+			newId++;
+		} else {
+			return newId;
+		}
+	}
+	return newId;
+}
+
+CBreakpoint::CBreakpoint()
+	: id(GetAvailableId())
+{
+}
+
+void CBreakpoint::ActivateInner(bool _active)
+{
+	if (_active) {
+		// Set 0xCC and save old value
+		uint8_t data = mem_readb(location);
+		if (data != 0xCC) {
+			oldData = data;
+			mem_writeb(location, 0xCC);
+		} else if (!active) {
+			// Another activate breakpoint is already here.
+			// Find it, and copy its oldData value
+			CBreakpoint* bp = FindOtherActiveBreakpoint(location, this);
+
+			if (!bp || bp->oldData == 0xCC) {
+				// This might also happen if there is a real 0xCC
+				// instruction here
+				DEBUG_ShowMsg("DEBUG: Internal error while activating breakpoint.\n");
+				oldData = 0xCC;
+			} else {
+				oldData = bp->oldData;
+			}
+		}
+	} else {
+		if (mem_readb(location) == 0xCC) {
+			if (oldData == 0xCC) {
+				DEBUG_ShowMsg("DEBUG: Internal error while deactivating breakpoint.\n");
+			}
+
+			// Check if we are the last active breakpoint at this location
+			bool otherActive = FindOtherActiveBreakpoint(location, this) != 0;
+
+			// If so, remove 0xCC and set old value
+			if (!otherActive) {
+				mem_writeb(location, oldData);
+			}
+		}
+	}
+}
 
 void CBreakpoint::Activate(bool _active)
 {
 #if !C_HEAVY_DEBUG
 	if (GetType() == BKPNT_PHYSICAL) {
-		if (_active) {
-			// Set 0xCC and save old value
-			uint8_t data = mem_readb(location);
-			if (data != 0xCC) {
-				oldData = data;
-				mem_writeb(location, 0xCC);
-			} else if (!active) {
-				// Another activate breakpoint is already here.
-				// Find it, and copy its oldData value
-				CBreakpoint* bp = FindOtherActiveBreakpoint(location, this);
-
-				if (!bp || bp->oldData == 0xCC) {
-					// This might also happen if there is a real 0xCC
-					// instruction here
-					DEBUG_ShowMsg(
-					    "DEBUG: Internal error while activating breakpoint.\n");
-					oldData = 0xCC;
-				} else {
-					oldData = bp->oldData;
-				}
-			}
-		} else {
-			if (mem_readb(location) == 0xCC) {
-				if (oldData == 0xCC) {
-					DEBUG_ShowMsg(
-					    "DEBUG: Internal error while deactivating breakpoint.\n");
-				}
-
-				// Check if we are the last active breakpoint at this location
-				bool otherActive = (FindOtherActiveBreakpoint(location, this) != 0);
-
-				// If so, remove 0xCC and set old value
-				if (!otherActive) {
-					mem_writeb(location, oldData);
-				}
-			}
-		}
+		ActivateInner(_active && enabled);
 	}
 #endif
 	active = _active;
 }
 
+void CBreakpoint::Enable(bool _enabled)
+{
+	if (enabled == _enabled)
+		return; // Nothing to do
+
+	enabled = _enabled;
+	ActivateInner(active && enabled);
+}
+
 // Statics
-static std::list<CBreakpoint*> BPoints = {};
 
 std::list<CBreakpoint*>::const_iterator CBreakpoint::begin() { return BPoints.begin(); }
 std::list<CBreakpoint*>::const_iterator CBreakpoint::end() { return BPoints.end(); }
+
+static void AddToList(CBreakpoint *bp)
+{
+	const auto it = std::lower_bound(BPoints.begin(),
+	                                 BPoints.end(),
+	                                 bp,
+	                                 [](const CBreakpoint* x, const CBreakpoint* y) {
+		                                 return x->GetId() < y->GetId();
+	                                 });
+
+	BPoints.insert(it, bp);
+}
 
 CBreakpoint* CBreakpoint::AddBreakpoint(uint16_t seg, uint32_t off, bool once)
 {
 	auto bp = new CBreakpoint();
 	bp->SetAddress(seg, off);
 	bp->SetOnce(once);
-	BPoints.push_front(bp);
+	AddToList(bp);
 	return bp;
 }
 
@@ -80,7 +111,7 @@ CBreakpoint* CBreakpoint::AddIntBreakpoint(uint8_t intNum, uint16_t ah,
 	auto bp = new CBreakpoint();
 	bp->SetInt(intNum, ah, al);
 	bp->SetOnce(once);
-	BPoints.push_front(bp);
+	AddToList(bp);
 	return bp;
 }
 
@@ -90,14 +121,13 @@ CBreakpoint* CBreakpoint::AddMemBreakpoint(uint16_t seg, uint32_t off)
 	bp->SetAddress(seg, off);
 	bp->SetOnce(false);
 	bp->SetType(BKPNT_MEMORY);
-	BPoints.push_front(bp);
+	AddToList(bp);
 	return bp;
 }
 
 void CBreakpoint::ActivateBreakpoints()
 {
 	// activate all breakpoints
-	std::list<CBreakpoint*>::iterator i;
 	for (auto& bp : BPoints) {
 		bp->Activate(true);
 	}
@@ -114,13 +144,23 @@ void CBreakpoint::DeactivateBreakpoints()
 void CBreakpoint::ActivateBreakpointsExceptAt(PhysPt adr)
 {
 	// activate all breakpoints, except those at adr
-	std::list<CBreakpoint*>::iterator i;
 	for (auto& bp : BPoints) {
 		// Do not activate breakpoints at adr
 		if (bp->GetType() == BKPNT_PHYSICAL && bp->GetLocation() == adr) {
 			continue;
 		}
 		bp->Activate(true);
+	}
+}
+
+void CBreakpoint::EnableBreakpoint(int id, bool enable)
+{
+	for (auto& bp : BPoints) {
+		// Do not activate breakpoints at adr
+		if (bp->GetId() == id) {
+			bp->Enable(enable);
+			return;
+		}
 	}
 }
 
@@ -134,10 +174,10 @@ bool CBreakpoint::CheckBreakpoint(Bitu seg, Bitu off)
 
 	// Search matching breakpoint
 	for (auto i = BPoints.begin(); i != BPoints.end(); ++i) {
-		auto bp = (*i);
+		auto bp = *i;
 
-		if ((bp->GetType() == BKPNT_PHYSICAL) && bp->IsActive() &&
-		    (bp->GetLocation() == GetAddress(seg, off))) {
+		if (bp->GetType() == BKPNT_PHYSICAL && bp->IsActive() &&
+		    bp->GetLocation() == GetAddress(seg, off)) {
 			// Found
 			if (bp->GetOnce()) {
 				// delete it, if it should only be used once
@@ -161,17 +201,20 @@ bool CBreakpoint::CheckBreakpoint(Bitu seg, Bitu off)
 			if ((bp->GetType() == BKPNT_MEMORY) ||
 			    (bp->GetType() == BKPNT_MEMORY_PROT) ||
 			    (bp->GetType() == BKPNT_MEMORY_LINEAR)) {
-				// Watch Protected Mode Memoryonly in pmode
+
+				// Watch Protected Mode MemoryOnly in pmode
 				if (bp->GetType() == BKPNT_MEMORY_PROT) {
 					// Check if pmode is active
 					if (!cpu.pmode) {
 						return false;
 					}
+
 					// Check if descriptor is valid
 					Descriptor desc;
 					if (!cpu.gdt.GetDescriptor(bp->GetSegment(), desc)) {
 						return false;
 					}
+
 					if (desc.GetLimit() == 0) {
 						return false;
 					}
@@ -183,10 +226,12 @@ bool CBreakpoint::CheckBreakpoint(Bitu seg, Bitu off)
 				} else {
 					address = GetAddress(bp->GetSegment(), bp->GetOffset());
 				}
+
 				uint8_t value = 0;
 				if (mem_readb_checked(address, &value)) {
 					return false;
 				}
+
 				if (bp->GetValue() != value) {
 					// Yup, memory value changed
 					DEBUG_ShowMsg("DEBUG: Memory breakpoint %s: %04X:%04X - %02X -> %02X\n",
@@ -215,11 +260,11 @@ bool CBreakpoint::CheckIntBreakpoint([[maybe_unused]] PhysPt adr, uint8_t intNr,
 
 	// Search matching breakpoint
 	for (auto i = BPoints.begin(); i != BPoints.end(); ++i) {
-		auto bp = (*i);
-		if ((bp->GetType() == BKPNT_INTERRUPT) && bp->IsActive() &&
-		    (bp->GetIntNr() == intNr)) {
-			if (((bp->GetValue() == BPINT_ALL) || (bp->GetValue() == ahValue)) &&
-			    ((bp->GetOther() == BPINT_ALL) || (bp->GetOther() == alValue))) {
+		auto bp = *i;
+		if (bp->GetType() == BKPNT_INTERRUPT && bp->IsActive() &&
+		    bp->GetIntNr() == intNr) {
+			if ((bp->GetValue() == BPINT_ALL || bp->GetValue() == ahValue) &&
+			    (bp->GetOther() == BPINT_ALL || bp->GetOther() == alValue)) {
 				// Ignore it once ?
 				// Found
 				if (bp->GetOnce()) {
@@ -304,11 +349,30 @@ bool CBreakpoint::IsBreakpoint(uint16_t seg, uint32_t off)
 	return FindPhysBreakpoint(seg, off, false) != 0;
 }
 
+bool CBreakpoint::DeleteBreakpoint(int id)
+{
+	for (auto i = BPoints.begin(); i != BPoints.end(); ++i) {
+		auto bp = *i;
+
+		if (bp->GetId() != id) {
+			continue;
+		}
+
+		BPoints.remove(bp);
+		bp->Activate(false);
+		delete bp;
+		return true;
+	}
+
+	return false;
+}
+
 bool CBreakpoint::DeleteBreakpoint(uint16_t seg, uint32_t off)
 {
 	CBreakpoint* bp = FindPhysBreakpoint(seg, off, false);
 	if (bp) {
 		BPoints.remove(bp);
+		bp->Activate(false);
 		delete bp;
 		return true;
 	}

@@ -556,8 +556,10 @@ void CPU_Interrupt(Bitu num,Bitu type,Bitu oldeip) {
 		CPU_DebugException(0,oldeip); // DR6 bits need updating
 		return;
 	}
+
 	lastint=num;
 	FillFlags();
+
 #if C_DEBUG
 	switch (num) {
 	case 0xcd:
@@ -572,8 +574,9 @@ void CPU_Interrupt(Bitu num,Bitu type,Bitu oldeip) {
 			CPU_Cycles=0;
 			return;
 		}
-	};
+	}
 #endif
+
 	if (!cpu.pmode) {
 		/* Save everything on a 16-bit stack */
 		CPU_Push16(reg_flags & 0xffff);

@@ -35,6 +35,15 @@ static void GetRegisters(DosboxDebugger::Registers& result)
 	result.gs = Segs.val[gs];
 }
 
+static void ResumeExecution() { // Based on DEBUG_Run
+	CPU_Cycles = 1;
+	(*cpudecoder)();
+
+	// ensure all breakpoints are activated
+	CBreakpoint::ActivateBreakpoints();
+	DOSBOX_SetNormalLoop();
+}
+
 class WorkQueue {
 	public:
 	void process()
@@ -147,7 +156,7 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 	{
 		Do([] {
 			printf("-> Continue\n");
-			DEBUG_Run(1, false);
+			ResumeExecution();
 		});
 	}
 
@@ -167,7 +176,38 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 		DosboxDebugger::Registers result;
 		Do([&result] {
 			printf("-> StepIn\n");
-			DEBUG_Run(1, true);
+			CPU_Cycles = 1;
+			(*cpudecoder)();
+			GetRegisters(result);
+		});
+		return result;
+	}
+
+	DosboxDebugger::Registers StepOver(const ::Ice::Current& current) override
+	{
+		DosboxDebugger::Registers result;
+		Do([&result] { 
+			printf("-> StepOver\n");
+
+			char dline[200];
+			PhysPt start = GetAddress(SegValue(cs), reg_eip);
+			Bitu size = DasmI386(dline, start, reg_eip, cpu.code.big);
+
+			if (strstr(dline, "call") || strstr(dline, "int") ||
+			    strstr(dline, "loop") || strstr(dline, "rep")) {
+				uint32_t nextIP = reg_eip + size;
+
+				// Don't add a temporary breakpoint if there's already one there
+				if (!CBreakpoint::FindPhysBreakpoint(SegValue(cs), nextIP, true)) {
+					CBreakpoint::AddBreakpoint(SegValue(cs), nextIP, true);
+				}
+
+				ResumeExecution();
+			} else {
+				CPU_Cycles = 1;
+				(*cpudecoder)();
+			}
+
 			GetRegisters(result);
 		});
 		return result;
@@ -178,7 +218,8 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 		DosboxDebugger::Registers result;
 		Do([&cycles, &result] {
 			printf("-> StepMultiple(%d)\n", cycles);
-			DEBUG_Run(cycles, true);
+			CPU_Cycles = cycles;
+			(*cpudecoder)();
 			GetRegisters(result);
 		});
 		return result;
@@ -191,7 +232,7 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 			if (!CBreakpoint::FindPhysBreakpoint(address.segment, address.offset, true)) {
 				CBreakpoint::AddBreakpoint(address.segment, address.offset, true);
 			}
-			DEBUG_Run(1, false);
+			ResumeExecution();
 		});
 	}
 
@@ -240,7 +281,7 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 	{
 		auto result = DosboxDebugger::ByteSequence(length);
 		Do([&address, &length, &result] {
-			printf("-> GetMemory(%x:%x, %d)\n", address.segment, address.offset, length);
+			// printf("-> GetMemory(%x:%x, %d)\n", address.segment, address.offset, length);
 			const auto uoff = (uint32_t)address.offset;
 			const auto ulen = (uint32_t)length;
 			for (uint32_t x = 0; x < ulen; x++) {
@@ -383,13 +424,19 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 				result.push_back(DosboxDebugger::Breakpoint());
 				auto& bp = result.back();
 
+				bp.id              = (*it)->GetId();
 				bp.address.segment = (*it)->GetSegment();
 				bp.address.offset  = (*it)->GetOffset();
 				bp.ah              = 0;
 				bp.al              = 0;
+				bp.enabled         = (*it)->IsEnabled();
 
 				switch ((*it)->GetType()) {
-				case BKPNT_PHYSICAL: bp.type = DosboxDebugger::BreakpointType::Normal; break;
+				case BKPNT_PHYSICAL:
+					bp.type = (*it)->GetOnce()
+					            ? DosboxDebugger::BreakpointType::Ephemeral
+					            : DosboxDebugger::BreakpointType::Normal;
+					break;
 
 				case BKPNT_INTERRUPT:
 					if ((*it)->GetValue() == BPINT_ALL) {
@@ -413,7 +460,6 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 					break;
 				}
 			}
-			printf("-> ListBreakpoints\n");
 		});
 		return result;
 	}
@@ -422,17 +468,25 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 	{
 		Do([&breakpoint] {
 			const char* typeName = "Unk";
+			CBreakpoint *bp = nullptr;
 			switch (breakpoint.type) {
 			case DosboxDebugger::BreakpointType::Normal:
 				typeName = "Normal";
-				CBreakpoint::AddBreakpoint(breakpoint.address.segment,
+				bp = CBreakpoint::AddBreakpoint(breakpoint.address.segment,
 				                           breakpoint.address.offset,
 				                           false);
 				break;
 
+			case DosboxDebugger::BreakpointType::Ephemeral:
+				typeName = "Ephemeral";
+				bp = CBreakpoint::AddBreakpoint(breakpoint.address.segment,
+				                           breakpoint.address.offset,
+				                           true);
+				break;
+
 			case DosboxDebugger::BreakpointType::Read:
 				typeName = "Read";
-				CBreakpoint::AddMemBreakpoint(breakpoint.address.segment,
+				bp = CBreakpoint::AddMemBreakpoint(breakpoint.address.segment,
 				                              breakpoint.address.offset);
 				break;
 
@@ -440,7 +494,7 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 
 			case DosboxDebugger::BreakpointType::Interrupt:
 				typeName = "Interrupt";
-				CBreakpoint::AddIntBreakpoint((uint8_t)breakpoint.address.offset,
+				bp = CBreakpoint::AddIntBreakpoint((uint8_t)breakpoint.address.offset,
 				                              BPINT_ALL,
 				                              BPINT_ALL,
 				                              false);
@@ -448,7 +502,7 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 
 			case DosboxDebugger::BreakpointType::InterruptWithAH:
 				typeName = "IntAH";
-				CBreakpoint::AddIntBreakpoint((uint8_t)breakpoint.address.offset,
+				bp = CBreakpoint::AddIntBreakpoint((uint8_t)breakpoint.address.offset,
 				                              breakpoint.ah,
 				                              BPINT_ALL,
 				                              false);
@@ -456,31 +510,43 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 
 			case DosboxDebugger::BreakpointType::InterruptWithAX:
 				typeName = "IntAX";
-				CBreakpoint::AddIntBreakpoint((uint8_t)breakpoint.address.offset,
+				bp = CBreakpoint::AddIntBreakpoint((uint8_t)breakpoint.address.offset,
 				                              breakpoint.ah,
 				                              breakpoint.al,
 				                              false);
 				break;
 			}
 
-			printf("-> SetBreakpoint(%x:%x, %s, %d, %d)\n",
+			if (bp != nullptr && !breakpoint.enabled)
+				CBreakpoint::EnableBreakpoint(bp->GetId(), false);
+
+			printf("-> SetBreakpoint(%x:%x, %s, %d, %d, %s)\n",
 			       breakpoint.address.segment,
 			       breakpoint.address.offset,
 			       typeName,
 			       (int)breakpoint.ah,
-			       (int)breakpoint.al);
+			       (int)breakpoint.al,
+			       breakpoint.enabled ? "enabled" : "disabled");
 		});
 	}
 
-	void DelBreakpoint(DosboxDebugger::Address address, const ::Ice::Current& current) override
+	void EnableBreakpoint(int id, bool enabled, const ::Ice::Current& current) override
 	{
-		Do([&address] {
-			printf("-> DelBreakpoint(%x:%x)\n", address.segment, address.offset);
-			CBreakpoint::DeleteBreakpoint(address.segment, address.offset);
+		Do([id, enabled] {
+			printf("-> EnableBreakpoint(%d, %s)\n", id, enabled ? "true" : "false");
+			CBreakpoint::EnableBreakpoint(id, enabled);
 		});
 	}
 
-	void SetReg(DosboxDebugger::Register reg, int value, const ::Ice::Current& current) override
+	void DelBreakpoint(int id, const ::Ice::Current& current) override
+	{
+		Do([id] {
+			printf("-> DelBreakpoint(%d)\n", id);
+			CBreakpoint::DeleteBreakpoint(id);
+		});
+	}
+
+	void SetRegister(DosboxDebugger::Register reg, int value, const ::Ice::Current& current) override
 	{
 		Do([&reg, &value] {
 			const char* regName = "";

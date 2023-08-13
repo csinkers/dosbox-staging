@@ -291,38 +291,47 @@ bool skipFirstInstruction = false;
 bool DEBUG_Breakpoint(void)
 {
 	/* First get the physical address and check for a set Breakpoint */
-	if (!CBreakpoint::CheckBreakpoint(SegValue(cs),reg_eip)) return false;
+	if (!CBreakpoint::CheckBreakpoint(SegValue(cs), reg_eip)) {
+		return false;
+	}
+
 	// Found. Breakpoint is valid
-	// PhysPt where=GetAddress(SegValue(cs),reg_eip); -- "where" is unused
-	CBreakpoint::DeactivateBreakpoints();	// Deactivate all breakpoints
+	// PhysPt where = GetAddress(SegValue(cs), reg_eip); -- "where" is unused
+	CBreakpoint::DeactivateBreakpoints(); // Deactivate all breakpoints
 	return true;
 }
 
 bool DEBUG_IntBreakpoint(uint8_t intNum)
 {
 	/* First get the physical address and check for a set Breakpoint */
-	PhysPt where=GetAddress(SegValue(cs),reg_eip);
-	if (!CBreakpoint::CheckIntBreakpoint(where,intNum,reg_ah,reg_al)) return false;
+	PhysPt where = GetAddress(SegValue(cs), reg_eip);
+	if (!CBreakpoint::CheckIntBreakpoint(where, intNum, reg_ah, reg_al)) {
+		return false;
+	}
 	// Found. Breakpoint is valid
-	CBreakpoint::DeactivateBreakpoints();	// Deactivate all breakpoints
+	CBreakpoint::DeactivateBreakpoints(); // Deactivate all breakpoints
 	return true;
 }
 
 static bool StepOver()
 {
-	exitLoop = false;
-	PhysPt start=GetAddress(SegValue(cs),reg_eip);
-	char dline[200];Bitu size;
-	size=DasmI386(dline, start, reg_eip, cpu.code.big);
+	exitLoop     = false;
+	PhysPt start = GetAddress(SegValue(cs), reg_eip);
+	char dline[200];
+	Bitu size = DasmI386(dline, start, reg_eip, cpu.code.big);
 
-	if (strstr(dline,"call") || strstr(dline,"int") || strstr(dline,"loop") || strstr(dline,"rep")) {
+	if (strstr(dline, "call") || strstr(dline, "int") ||
+	    strstr(dline, "loop") || strstr(dline, "rep")) {
+
+		uint32_t nextIP = reg_eip + size;
 		// Don't add a temporary breakpoint if there's already one here
-		if (!CBreakpoint::FindPhysBreakpoint(SegValue(cs), reg_eip+size, true))
-			CBreakpoint::AddBreakpoint(SegValue(cs),reg_eip+size, true);
-		debugging=false;
+		if (!CBreakpoint::FindPhysBreakpoint(SegValue(cs), nextIP, true)) {
+			    CBreakpoint::AddBreakpoint(SegValue(cs), nextIP, true);
+		}
+		debugging = false;
 		DrawCode();
 		return true;
-	} 
+	}
 	return false;
 }
 
@@ -434,6 +443,8 @@ static void DrawRegisters(void) {
 }
 
 static void DrawCode(void) {
+	if (atoi("0") == 0) return;
+
 	bool saveSel;
 	uint32_t disEIP = codeViewData.useEIP;
 	PhysPt start  = GetAddress(codeViewData.useCS,codeViewData.useEIP);
@@ -1218,6 +1229,9 @@ int32_t DEBUG_Run(int32_t amount,bool quickexit) {
 }
 
 uint32_t DEBUG_CheckKeys(void) {
+	if (atoi("0") == 0)
+		return 0;
+
 	Bits ret=0;
 	bool numberrun = false;
 	bool skipDraw = false;
@@ -1506,52 +1520,57 @@ extern std::queue<SDL_Event> pdc_event_queue;
 
 void DEBUG_Enable(bool pressed)
 {
-	if (!pressed)
-		return;
-
-	// Maybe construct the debugger's UI
-	static bool was_ui_started = false;
-	if (!was_ui_started) {
-		DBGUI_StartUp();
-		was_ui_started = (pdc_window != nullptr);
-	}
-
-	// The debugger is run in release mode so cannot use asserts
-	if (!was_ui_started) {
-		LOG_ERR("DEBUG: Failed to start up the debug window");
+	if (!pressed) {
 		return;
 	}
 
-	// Defocus the graphical UI and bring the debugger UI into focus
-	GFX_LosingFocus();
-	pdc_event_queue = {};
-	SDL_RaiseWindow(pdc_window);
-	SDL_SetWindowInputFocus(pdc_window);
-	SetCodeWinStart();
-	DEBUG_DrawScreen();
+	if (atoi("1") == 0) {
+		// Maybe construct the debugger's UI
+		static bool was_ui_started = false;
+		if (!was_ui_started) {
+			DBGUI_StartUp();
+			was_ui_started = (pdc_window != nullptr);
+		}
 
-	// Maybe show help for the first time in the debugger
-	static bool was_help_shown = false;
-	if (!was_help_shown) {
-		DEBUG_ShowMsg("***| TYPE HELP (+ENTER) TO GET AN OVERVIEW OF ALL COMMANDS |***\n");
-		was_help_shown = true;
+		// The debugger is run in release mode so cannot use asserts
+		if (!was_ui_started) {
+			LOG_ERR("DEBUG: Failed to start up the debug window");
+			return;
+		}
+
+		// Defocus the graphical UI and bring the debugger UI into focus
+		GFX_LosingFocus();
+		pdc_event_queue = {};
+		SDL_RaiseWindow(pdc_window);
+		SDL_SetWindowInputFocus(pdc_window);
+		SetCodeWinStart();
+		DEBUG_DrawScreen();
+
+		// Maybe show help for the first time in the debugger
+		static bool was_help_shown = false;
+		if (!was_help_shown) {
+			DEBUG_ShowMsg(
+			    "***| TYPE HELP (+ENTER) TO GET AN OVERVIEW OF ALL COMMANDS |***\n");
+			was_help_shown = true;
+		}
+
+		// Start the debugging loops
+		debugging = true;
+		DOSBOX_SetLoop(&DEBUG_Loop);
+
+		KEYBOARD_ClrBuffer();
 	}
-
-	// Start the debugging loops
-	debugging = true;
-	DOSBOX_SetLoop(&DEBUG_Loop);
-
-	KEYBOARD_ClrBuffer();
 
 	// Start debug host thread
 	DEBUG_StartHost();
 }
 
 void DEBUG_DrawScreen(void) {
+	/*
 	DrawData();
 	DrawCode();
 	DrawRegisters();
-	DrawVariables();
+	DrawVariables();*/
 }
 
 static void DEBUG_RaiseTimerIrq(void) {
