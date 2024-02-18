@@ -27,12 +27,12 @@ static void GetRegisters(DosboxDebugger::Registers& result)
 	result.esp   = (int)reg_esp;
 	result.eip   = (int)reg_eip;
 
-	result.cs = Segs.val[cs];
-	result.ds = Segs.val[ds];
-	result.es = Segs.val[es];
-	result.ss = Segs.val[ss];
-	result.fs = Segs.val[fs];
-	result.gs = Segs.val[gs];
+	result.cs = (short)Segs.val[cs];
+	result.ds = (short)Segs.val[ds];
+	result.es = (short)Segs.val[es];
+	result.ss = (short)Segs.val[ss];
+	result.fs = (short)Segs.val[fs];
+	result.gs = (short)Segs.val[gs];
 }
 
 static void ResumeExecution() { // Based on DEBUG_Run
@@ -162,7 +162,7 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 
 	DosboxDebugger::Registers Break(const ::Ice::Current& current) override
 	{
-		DosboxDebugger::Registers result;
+		DosboxDebugger::Registers result = {};
 		Do([&result] {
 			printf("-> Break\n");
 			DOSBOX_SetLoop(&DEBUG_Loop);
@@ -173,7 +173,7 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 
 	DosboxDebugger::Registers StepIn(const ::Ice::Current& current) override
 	{
-		DosboxDebugger::Registers result;
+		DosboxDebugger::Registers result = {};
 		Do([&result] {
 			printf("-> StepIn\n");
 			CPU_Cycles = 1;
@@ -185,17 +185,17 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 
 	DosboxDebugger::Registers StepOver(const ::Ice::Current& current) override
 	{
-		DosboxDebugger::Registers result;
+		DosboxDebugger::Registers result = {};
 		Do([&result] { 
 			printf("-> StepOver\n");
 
 			char dline[200];
-			PhysPt start = GetAddress(SegValue(cs), reg_eip);
-			Bitu size = DasmI386(dline, start, reg_eip, cpu.code.big);
+			const PhysPt start = GetAddress(SegValue(cs), reg_eip);
+			const Bitu size = DasmI386(dline, start, reg_eip, cpu.code.big);
 
 			if (strstr(dline, "call") || strstr(dline, "int") ||
 			    strstr(dline, "loop") || strstr(dline, "rep")) {
-				uint32_t nextIP = reg_eip + size;
+				const auto nextIP = (uint32_t)(reg_eip + size);
 
 				// Don't add a temporary breakpoint if there's already one there
 				if (!CBreakpoint::FindPhysBreakpoint(SegValue(cs), nextIP, true)) {
@@ -215,7 +215,7 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 
 	DosboxDebugger::Registers StepMultiple(int cycles, const ::Ice::Current& current) override
 	{
-		DosboxDebugger::Registers result;
+		DosboxDebugger::Registers result = {};
 		Do([&cycles, &result] {
 			printf("-> StepMultiple(%d)\n", cycles);
 			CPU_Cycles = cycles;
@@ -238,7 +238,7 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 
 	DosboxDebugger::Registers GetState(const ::Ice::Current& current) override
 	{
-		DosboxDebugger::Registers result;
+		DosboxDebugger::Registers result = {};
 		Do([&result] { GetRegisters(result); });
 		return result;
 	}
@@ -250,15 +250,16 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 		Do([&address, &length, &result] {
 			printf("-> Disassemble(%x:%x, %d)\n", address.segment, address.offset, length);
 
-			char buffer[200];
-			PhysPt start = GetAddress(address.segment, address.offset);
+			const PhysPt start = GetAddress(address.segment, address.offset);
 			PhysPt cur = start;
+
 			for (int i = 0; i < length; i++) {
-				Bitu size = DasmI386(buffer, cur, cur, cpu.code.big);
+				char buffer[200];
+				const Bitu size = DasmI386(buffer, cur, cur, cpu.code.big);
 
 				DosboxDebugger::AssemblyLine line;
 				line.address.segment = address.segment;
-				line.address.offset = address.offset + (cur - start);
+				line.address.offset = (int)(address.offset + (cur - start));
 				line.line = buffer;
 
 				for (Bitu c = 0; c < size; c++) {
@@ -316,14 +317,14 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 		if (!cpu.gdt.GetDescriptor(seg, desc)) 
 			return 0;
 
-		PhysPt minPage     = desc.GetBase() >> 12;
-		PhysPt maxPhysAddr = desc.GetBase() + desc.GetLimit();
-		PhysPt maxPage     = maxPhysAddr >> 12;
+		const PhysPt minPage               = desc.GetBase() >> 12;
+		const PhysPt maxPhysAddrForSegment = desc.GetBase() + desc.GetLimit();
+		const PhysPt maxPage               = maxPhysAddrForSegment >> 12;
 
 		for (PhysPt i = maxPage; i >= minPage; i--) {
 			if (paging.tlb.read[i] != nullptr) {
-				PhysPt maxPhysAddr = (i << 12) + 0xfff;
-				PhysPt segmentRelative = maxPhysAddr - desc.GetBase();
+				const PhysPt maxPhysAddrForPage = (i << 12) + 0xfff;
+				const PhysPt segmentRelative = maxPhysAddrForPage - desc.GetBase();
 				return (int)segmentRelative;
 			}
 
@@ -350,7 +351,7 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 			advance = (int)pattern.size();
 
 		if (length == -1) {
-			PhysPt maxAddr = (PhysPt)GetMaxNonEmptyAddress(start.segment, current);
+			const auto maxAddr = (PhysPt)GetMaxNonEmptyAddress(start.segment, current);
 			length = (int)(maxAddr - start.offset);
 		}
 
@@ -358,7 +359,7 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 		if (!cpu.gdt.GetDescriptor(start.segment, desc)) 
 			return results;
 
-		PhysPt maxPhysAddr = desc.GetBase() + desc.GetLimit();
+		const PhysPt maxPhysAddr = desc.GetBase() + desc.GetLimit();
 		PhysPt p = desc.GetBase() + start.offset;
 		if (p > maxPhysAddr)
 			return results;
@@ -368,9 +369,10 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 			endAddr = maxPhysAddr;
 
 		while (p < endAddr) {
-			PhysPt pageNum = p >> 12;
+			const PhysPt pageNum = p >> 12;
+			const auto pEnd = (PhysPt)(p + pattern.size() - 1);
 			HostPt page = paging.tlb.read[pageNum];
-			HostPt endPage = paging.tlb.read[(p + pattern.size() - 1) >> 12];
+			HostPt endPage = paging.tlb.read[pEnd >> 12];
 
 			if (page == nullptr) {
 				while (p >> 12 == pageNum) {
@@ -387,7 +389,7 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 
 					if (i == pattern.size() - 1)
 					{
-						DosboxDebugger::Address result;
+						DosboxDebugger::Address result = {};
 						result.segment = start.segment;
 						result.offset  = (int)(p - desc.GetBase());
 						results.push_back(result);
@@ -402,7 +404,7 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 
 					if (i == pattern.size() - 1)
 					{
-						DosboxDebugger::Address result;
+						DosboxDebugger::Address result = {};
 						result.segment = start.segment;
 						result.offset  = (int)(p - desc.GetBase());
 						results.push_back(result);
@@ -420,13 +422,13 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 	{
 		DosboxDebugger::BreakpointSequence result;
 		Do([&result] {
-			for (auto& it = CBreakpoint::begin(); it != CBreakpoint::end(); ++it) {
+			for (auto it = CBreakpoint::begin(); it != CBreakpoint::end(); ++it) {
 				result.push_back(DosboxDebugger::Breakpoint());
 				auto& bp = result.back();
 
 				bp.id              = (*it)->GetId();
-				bp.address.segment = (*it)->GetSegment();
-				bp.address.offset  = (*it)->GetOffset();
+				bp.address.segment = (short)(*it)->GetSegment();
+				bp.address.offset  = (int)(*it)->GetOffset();
 				bp.ah              = 0;
 				bp.al              = 0;
 				bp.enabled         = (*it)->IsEnabled();
@@ -468,13 +470,13 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 	{
 		Do([&breakpoint] {
 			const char* typeName = "Unk";
-			CBreakpoint *bp = nullptr;
+			const CBreakpoint *bp = nullptr;
 			switch (breakpoint.type) {
 			case DosboxDebugger::BreakpointType::Normal:
 				typeName = "Normal";
 				bp = CBreakpoint::AddBreakpoint(breakpoint.address.segment,
-				                           breakpoint.address.offset,
-				                           false);
+				                                breakpoint.address.offset,
+				                                false);
 				break;
 
 			case DosboxDebugger::BreakpointType::Ephemeral:
@@ -514,6 +516,9 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 				                              breakpoint.ah,
 				                              breakpoint.al,
 				                              false);
+				break;
+
+			case DosboxDebugger::BreakpointType::Unknown:
 				break;
 			}
 
@@ -573,18 +578,18 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 		});
 	}
 
-	void AddDescriptor(DosboxDebugger::Descriptors& results, Descriptor& desc)
+	void AddDescriptor(DosboxDebugger::Descriptors& results, Descriptor& desc) const
 	{
 		if (desc.Type() & 0x04) { // Gate
-			auto result    = std::make_shared<DosboxDebugger::GateDescriptor>();
+			const auto result    = std::make_shared<DosboxDebugger::GateDescriptor>();
 			result->type   = (DosboxDebugger::SegmentType)desc.Type();
 			result->offset = (int)desc.GetOffset();
-			result->selector = (int)desc.GetSelector();
+			result->selector = (short)desc.GetSelector();
 			result->dpl      = desc.DPL();
 			result->big      = !!desc.Big();
 			results.push_back(result);
 		} else { // Segment
-			auto result = std::make_shared<DosboxDebugger::SegmentDescriptor>();
+			const auto result = std::make_shared<DosboxDebugger::SegmentDescriptor>();
 			result->type  = (DosboxDebugger::SegmentType)desc.Type();
 			result->base  = (int)desc.GetBase();
 			result->limit = (int)desc.GetLimit();
@@ -597,9 +602,9 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 	DosboxDebugger::Descriptors GetGdt(const Ice::Current& current) override
 	{
 		Descriptor desc;
-		Bitu length    = cpu.gdt.GetLimit();
-		PhysPt address = cpu.gdt.GetBase();
-		PhysPt max     = (PhysPt)(address + length);
+		const Bitu length = cpu.gdt.GetLimit();
+		PhysPt address    = cpu.gdt.GetBase();
+		const auto max    = (PhysPt)(address + length);
 
 		DosboxDebugger::Descriptors results;
 		while (address < max) {
@@ -614,15 +619,15 @@ class DebugHostImpl : public DosboxDebugger::DebugHost {
 	{
 		DosboxDebugger::Descriptors results;
 		Descriptor desc;
-		Bitu ldtSelector = cpu.gdt.SLDT();
+		const Bitu ldtSelector = cpu.gdt.SLDT();
 
 		if (!cpu.gdt.GetDescriptor(ldtSelector, desc)) {
 			return results;
 		}
 
-		Bitu length    = desc.GetLimit();
-		PhysPt address = desc.GetBase();
-		PhysPt max     = (PhysPt)(address + length);
+		const Bitu length = desc.GetLimit();
+		PhysPt address    = desc.GetBase();
+		const PhysPt max  = (PhysPt)(address + length);
 		while (address < max) {
 			desc.Load(address);
 			AddDescriptor(results, desc);
@@ -649,13 +654,13 @@ static shared_ptr<Ice::Communicator> communicator;
 static void ServerThread()
 {
 	try {
-		Ice::PropertiesPtr properties = Ice::createProperties();
+		const Ice::PropertiesPtr properties = Ice::createProperties();
 		properties->setProperty("Ice.MessageSizeMax", "2097152");
 
 		Ice::InitializationData initData = Ice::InitializationData();
 		initData.properties = properties;
 
-		Ice::CommunicatorHolder ich(initData, ICE_INT_VERSION);
+		const Ice::CommunicatorHolder ich(initData, ICE_INT_VERSION);
 		communicator = ich.communicator();
 
 		const auto adapter = ich->createObjectAdapterWithEndpoints("DebugHostAdapter",
@@ -671,7 +676,7 @@ static void ServerThread()
 
 static void AlertClients()
 {
-	DosboxDebugger::Registers state;
+	DosboxDebugger::Registers state = {};
 	GetRegisters(state);
 	g_clients.ForEach([&state](auto client) {
 		client->StoppedAsync(
@@ -705,7 +710,7 @@ void DEBUG_StopHost()
 static LoopHandler* lastLoop;
 void DEBUG_PollWork()
 {
-	auto loop = DOSBOX_GetLoop();
+	const auto loop = DOSBOX_GetLoop();
 	if (loop != lastLoop && loop == DEBUG_Loop) {
 		AlertClients();
 	}
