@@ -18,6 +18,7 @@
       "name": "tracy",
       "platform": "!(windows & arm64)"
     },
+    "zeroc-ice",
     "zlib-ng",
     {
       "name": "pkgconf",

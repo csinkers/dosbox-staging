@@ -180,6 +180,7 @@ static Bitu Normal_Loop()
 				}
 			}
 #if C_DEBUG
+			DEBUG_PollWork();
 			if (DEBUG_ExitLoop()) {
 				return 0;
 			}
@@ -439,6 +440,10 @@ const char* DOSBOX_GetDetailedVersion() noexcept
 
 void DOSBOX_SetLoop(LoopHandler * handler) {
 	loop=handler;
+}
+
+LoopHandler* DOSBOX_GetLoop() {
+	return loop;
 }
 
 void DOSBOX_SetNormalLoop() {
@@ -881,6 +886,7 @@ void DOSBOX_Init()
 
 #if C_DEBUG
 	secprop = control->AddSection_prop("debug", &DEBUG_Init);
+	DEBUG_StartHost();
 #endif
 
 	// Configure Sound Blaster and ESS

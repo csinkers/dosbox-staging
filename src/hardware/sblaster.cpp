@@ -728,7 +728,7 @@ static void configure_opl_filter(MixerChannelPtr opl_channel,
 
 static void sb_raise_irq(const SbIrq irq_type)
 {
-	LOG(LOG_SB, LOG_NORMAL)("Raising IRQ");
+	// LOG(LOG_SB, LOG_NORMAL)("Raising IRQ");
 
 	switch (irq_type) {
 		case SbIrq::Irq8:

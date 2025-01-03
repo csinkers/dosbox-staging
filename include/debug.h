@@ -30,6 +30,11 @@ void DEBUG_Enable(bool pressed);
 void DEBUG_CheckExecuteBreakpoint(uint16_t seg, uint32_t off);
 bool DEBUG_ExitLoop(void);
 void DEBUG_RefreshPage(int scroll);
+
+void DEBUG_StartHost();
+void DEBUG_PollWork();
+void DEBUG_StopHost();
+
 Bitu DEBUG_EnableDebugger();
 
 extern Bitu cycle_count;

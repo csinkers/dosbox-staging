@@ -907,6 +907,30 @@
     <ClCompile Include="..\src\midi\midi_soundcanvas.cpp">
       <Filter>src\midi</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\debug\debug_host.cpp">
+      <Filter>src\debug</Filter>
+    </ClCompile>
+    <ClCompile Include="Win32\Debug\debug_protocol.cpp">
+      <Filter>Source Files\Win32\Debug</Filter>
+    </ClCompile>
+    <ClCompile Include="x64\Debug\debug_protocol.cpp">
+      <Filter>Source Files\x64\Debug</Filter>
+    </ClCompile>
+    <ClCompile Include="Win32\Release\debug_protocol.cpp">
+      <Filter>Source Files\Win32\Release</Filter>
+    </ClCompile>
+    <ClCompile Include="x64\Release\debug_protocol.cpp">
+      <Filter>Source Files\x64\Release</Filter>
+    </ClCompile>
+    <ClCompile Include="Win32\Tracy\debug_protocol.cpp">
+      <Filter>Source Files\Win32\Tracy</Filter>
+    </ClCompile>
+    <ClCompile Include="x64\Tracy\debug_protocol.cpp">
+      <Filter>Source Files\x64\Tracy</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\debug\debug_bp.cpp">
+      <Filter>src\debug</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\ansi_code_markup.h">
@@ -1765,6 +1789,27 @@
     <ClInclude Include="..\src\midi\midi_soundcanvas.h">
       <Filter>src\midi</Filter>
     </ClInclude>
+    <ClInclude Include="Win32\Debug\debug_protocol.h">
+      <Filter>Header Files\Win32\Debug</Filter>
+    </ClInclude>
+    <ClInclude Include="x64\Debug\debug_protocol.h">
+      <Filter>Header Files\x64\Debug</Filter>
+    </ClInclude>
+    <ClInclude Include="Win32\Release\debug_protocol.h">
+      <Filter>Header Files\Win32\Release</Filter>
+    </ClInclude>
+    <ClInclude Include="x64\Release\debug_protocol.h">
+      <Filter>Header Files\x64\Release</Filter>
+    </ClInclude>
+    <ClInclude Include="Win32\Tracy\debug_protocol.h">
+      <Filter>Header Files\Win32\Tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="x64\Tracy\debug_protocol.h">
+      <Filter>Header Files\x64\Tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\debug\debug_internal.h">
+      <Filter>src\debug</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\src\winres.rc">
@@ -1912,5 +1957,72 @@
     <Filter Include="src\audio\clap">
       <UniqueIdentifier>{3d4410d3-5abe-4949-ba77-e1e8c5a4d4ce}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Slice Files">
+      <UniqueIdentifier>{4094eab0-3511-4465-90ed-95699d63432f}</UniqueIdentifier>
+      <Extensions>ice</Extensions>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{445b2dbf-2005-43ed-8d93-cd612d671332}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Win32">
+      <UniqueIdentifier>{ffb5d736-581f-4ae8-a397-9388d56d7dfc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Win32\Debug">
+      <UniqueIdentifier>{12a88653-c233-42cd-bc46-ac611c4fab41}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\x64">
+      <UniqueIdentifier>{7137aef7-917c-42c1-b598-09fa6e6f8d8b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\x64\Debug">
+      <UniqueIdentifier>{d5ea5514-d679-4cc8-aec6-55f851131341}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Win32\Release">
+      <UniqueIdentifier>{077c34aa-e6ee-425d-b720-7d40c0907127}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\x64\Release">
+      <UniqueIdentifier>{96562eb7-ba7f-4885-9362-39d3c1c75bfc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Win32\Tracy">
+      <UniqueIdentifier>{3b3aa00f-d180-45f3-8542-9fdcd683e9f9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\x64\Tracy">
+      <UniqueIdentifier>{8c724a6f-7125-4a64-9258-26389d1d4403}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{3e97e228-8908-4876-9327-f8e4799b2894}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Win32">
+      <UniqueIdentifier>{8eb7e4de-2614-4338-98ee-2826d2074c76}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Win32\Debug">
+      <UniqueIdentifier>{09d0bb0b-b7c1-4a65-bae6-dd4737196706}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\x64">
+      <UniqueIdentifier>{5d2e064b-fa64-47c1-bce0-e510a889f063}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\x64\Debug">
+      <UniqueIdentifier>{dba94c5b-bc2d-4542-8d00-a791e70b8071}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Win32\Release">
+      <UniqueIdentifier>{e3973ec7-dd9b-4599-a478-0366a5af25be}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\x64\Release">
+      <UniqueIdentifier>{459bcb06-c3c6-48a7-b520-b1ca01be9549}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Win32\Tracy">
+      <UniqueIdentifier>{085eb689-c62d-4ee2-9480-4de7fb32efd4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\x64\Tracy">
+      <UniqueIdentifier>{08011006-802a-49d8-ba53-ac5c830ba688}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\vcpkg.json" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <SliceCompile Include="..\debug_protocol.ice">
+      <Filter>Slice Files</Filter>
+    </SliceCompile>
   </ItemGroup>
 </Project>

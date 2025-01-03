@@ -28,5 +28,6 @@
     <ClCompile Include="..\stubs.cpp" />
     <ClCompile Include="..\support_tests.cpp" />
     <ClCompile Include="..\..\src\misc\messages_stubs.cpp" />
+    <ClCompile Include="..\..\src\misc\messages_stubs.cpp" />
   </ItemGroup>
 </Project>

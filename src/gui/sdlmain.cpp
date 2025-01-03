@@ -5115,6 +5115,10 @@ int sdl_main(int argc, char* argv[])
 		return_code = 1;
 	}
 
+#if (C_DEBUG)
+		DEBUG_StopHost();
+#endif
+
 #if defined(WIN32)
 	// Might not be needed if the shutdown function switches to windowed
 	// mode, but it doesn't hurt

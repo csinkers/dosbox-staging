@@ -4,7 +4,7 @@
 /* Strings to be returned by virtual drivers, etc. */
 
 /* Define to 1 to enable internal debugger, requires libcurses */
-#define C_DEBUG 0
+#define C_DEBUG 1
 
 /* Define to 1 to use opengl display output support */
 #define C_OPENGL 1
