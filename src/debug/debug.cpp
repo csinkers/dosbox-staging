@@ -288,7 +288,8 @@ static std::vector<CDebugVar *> varList = {};
 /* Breakpoint stuff */
 /********************/
 
-bool skipFirstInstruction = false;
+static bool skipFirstInstruction = false;
+static std::list<CBreakpoint*> BPoints = {}; // Must be kept sorted by id
 
 static int GetAvailableId()
 {
@@ -368,8 +369,6 @@ void CBreakpoint::Enable(bool _enabled)
 }
 
 // Statics
-static std::list<CBreakpoint*> BPoints = {}; // Must be kept sorted by id
-
 std::list<CBreakpoint*>::const_iterator CBreakpoint::begin() { return BPoints.begin(); }
 std::list<CBreakpoint*>::const_iterator CBreakpoint::end() { return BPoints.end(); }
 
@@ -721,8 +720,6 @@ bool DEBUG_Breakpoint(void)
 	/* First get the physical address and check for a set Breakpoint */
 	if (!CBreakpoint::CheckBreakpoint(SegValue(cs), reg_eip)) return false;
 
-	return 0;
-	return FindPhysBreakpoint(seg, off, false) != 0;
 	// Found. Breakpoint is valid
 	// PhysPt where = GetAddress(SegValue(cs), reg_eip); -- "where" is unused
 	CBreakpoint::DeactivateBreakpoints(); // Deactivate all breakpoints
