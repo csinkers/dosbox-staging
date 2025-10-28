@@ -23,6 +23,7 @@ void DEBUG_CheckExecuteBreakpoint(uint16_t seg, uint32_t off);
 bool DEBUG_ExitLoop(void);
 void DEBUG_RefreshPage(int scroll);
 Bitu DEBUG_EnableDebugger();
+void DEBUG_PollWork();
 
 void LOG_StartUp();
 void LOG_Init();

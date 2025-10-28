@@ -23,6 +23,7 @@
 #include "cpu/paging.h"
 #include "debugger.h"
 #include "debugger_inc.h"
+#include "debugger_internal.h"
 #include "dos/programs.h"
 #include "gui/common.h"
 #include "gui/mapper.h"
@@ -270,149 +271,85 @@ static std::vector<CDebugVar *> varList = {};
 /* Breakpoint stuff */
 /********************/
 
-bool skipFirstInstruction = false;
+// Statics
+static bool skipFirstInstruction = false;
+static std::list<CBreakpoint *> BPoints = {}; // Must be kept sorted by id!
+std::list<CBreakpoint*>::const_iterator CBreakpoint::begin() { return BPoints.begin(); }
+std::list<CBreakpoint*>::const_iterator CBreakpoint::end() { return BPoints.end(); }
 
-enum EBreakpoint {
-	BKPNT_UNKNOWN,
-	BKPNT_PHYSICAL,
-	BKPNT_INTERRUPT,
-	BKPNT_MEMORY,
-	BKPNT_MEMORY_READ,
-	BKPNT_MEMORY_PROT,
-	BKPNT_MEMORY_LINEAR
-};
-
-#define BPINT_ALL 0x100
-
-class CBreakpoint
+static int GetAvailableId()
 {
-public:
-
-	CBreakpoint(void);
-	void					SetAddress		(uint16_t seg, uint32_t off)	{ location = GetAddress(seg,off); type = BKPNT_PHYSICAL; segment = seg; offset = off; }
-	void					SetAddress		(PhysPt adr)				{ location = adr; type = BKPNT_PHYSICAL; }
-	void					SetInt			(uint8_t _intNr, uint16_t ah, uint16_t al)	{ intNr = _intNr, ahValue = ah; alValue = al; type = BKPNT_INTERRUPT; }
-	void					SetOnce			(bool _once)				{ once = _once; }
-	void					SetType			(EBreakpoint _type)			{ type = _type; }
-	void					SetValue		(uint8_t value)				{ ahValue = value; }
-	void					SetOther		(uint8_t other)				{ alValue = other; }
-
-	bool					IsActive		(void)						{ return active; }
-	void					Activate		(bool _active);
-
-	EBreakpoint GetType() const noexcept { return type; }
-	bool GetOnce() const noexcept { return once; }
-	PhysPt GetLocation() const noexcept { return location; }
-	uint16_t GetSegment() const noexcept { return segment; }
-	uint32_t GetOffset() const noexcept { return offset; }
-	uint8_t GetIntNr() const noexcept { return intNr; }
-	uint16_t GetValue() const noexcept { return ahValue; }
-	uint16_t GetOther() const noexcept { return alValue; }
-#if C_HEAVY_DEBUGGER
-	void FlagMemoryAsRead()
-	{
-		memory_was_read = true;
+	int newId = 0;
+	for (auto& it : BPoints) {
+		int id = it->GetId();
+		if (id == newId) {
+			newId++;
+		} else {
+			return newId;
+		}
 	}
+	return newId;
+}
 
-	void FlagMemoryAsUnread()
-	{
-		memory_was_read = false;
+CBreakpoint::CBreakpoint() : id(GetAvailableId()) { }
+
+void CBreakpoint::ActivateInner(bool _active)
+{
+	if (_active) {
+		// Set 0xCC and save old value
+		uint8_t data = mem_readb(location);
+		if (data != 0xCC) {
+			oldData = data;
+			mem_writeb(location, 0xCC);
+		} else if (!active) {
+			// Another activate breakpoint is already here.
+			// Find it, and copy its oldData value
+			CBreakpoint* bp = FindOtherActiveBreakpoint(location, this);
+
+			if (!bp || bp->oldData == 0xCC) {
+				// This might also happen if there is a real 0xCC
+				// instruction here
+				DEBUG_ShowMsg("DEBUG: Internal error while activating breakpoint.\n");
+				oldData = 0xCC;
+			} else {
+				oldData = bp->oldData;
+			}
+		}
+	} else {
+		if (mem_readb(location) == 0xCC) {
+			if (oldData == 0xCC) {
+				DEBUG_ShowMsg("DEBUG: Internal error while deactivating breakpoint.\n");
+			}
+
+			// Check if we are the last active breakpoint at this location
+			bool otherActive = FindOtherActiveBreakpoint(location, this) != nullptr;
+
+			// If so, remove 0xCC and set old value
+			if (!otherActive) {
+				mem_writeb(location, oldData);
+			}
+		}
 	}
-
-	bool WasMemoryRead() const
-	{
-		return memory_was_read;
-	}
-#endif
-
-	// statics
-	static CBreakpoint*		AddBreakpoint		(uint16_t seg, uint32_t off, bool once);
-	static CBreakpoint*		AddIntBreakpoint	(uint8_t intNum, uint16_t ah, uint16_t al, bool once);
-	static CBreakpoint*		AddMemBreakpoint	(uint16_t seg, uint32_t off);
-	static void				DeactivateBreakpoints();
-	static void				ActivateBreakpoints	();
-	static void				ActivateBreakpointsExceptAt(PhysPt adr);
-	static bool				CheckBreakpoint		(PhysPt adr);
-	static bool				CheckBreakpoint		(Bitu seg, Bitu off);
-	static bool				CheckIntBreakpoint	(PhysPt adr, uint8_t intNr, uint16_t ahValue, uint16_t alValue);
-	static CBreakpoint*		FindPhysBreakpoint	(uint16_t seg, uint32_t off, bool once);
-	static CBreakpoint*		FindOtherActiveBreakpoint(PhysPt adr, CBreakpoint* skip);
-	static bool				IsBreakpoint		(uint16_t seg, uint32_t off);
-	static bool				DeleteBreakpoint	(uint16_t seg, uint32_t off);
-	static bool				DeleteByIndex		(uint16_t index);
-	static void				DeleteAll			(void);
-	static void				ShowList			(void);
-
-
-private:
-	EBreakpoint type = {};
-	// Physical
-	PhysPt location  = 0;
-	uint8_t oldData  = 0;
-	uint16_t segment = 0;
-	uint32_t offset  = 0;
-	// Int
-	uint8_t intNr    = 0;
-	uint16_t ahValue = 0;
-	uint16_t alValue = 0;
-	// Shared
-	bool active = 0;
-	bool once   = 0;
-#if C_HEAVY_DEBUGGER
-	bool memory_was_read = false;
-
-	friend bool DEBUG_HeavyIsBreakpoint(void);
-#	endif
-};
-
-CBreakpoint::CBreakpoint(void):
-type(BKPNT_UNKNOWN),
-location(0),oldData(0xCC),
-segment(0),offset(0),intNr(0),ahValue(0),alValue(0),
-active(false),once(false){ }
+}
 
 void CBreakpoint::Activate(bool _active)
 {
 #if !C_HEAVY_DEBUGGER
 	if (GetType() == BKPNT_PHYSICAL) {
-		if (_active) {
-			// Set 0xCC and save old value
-			uint8_t data = mem_readb(location);
-			if (data != 0xCC) {
-				oldData = data;
-				mem_writeb(location,0xCC);
-			} else if (!active) {
-				// Another activate breakpoint is already here.
-				// Find it, and copy its oldData value
-				CBreakpoint *bp = FindOtherActiveBreakpoint(location, this);
-
-				if (!bp || bp->oldData == 0xCC) {
-					// This might also happen if there is a real 0xCC instruction here
-					DEBUG_ShowMsg("DEBUG: Internal error while activating breakpoint.\n");
-					oldData = 0xCC;
-				} else
-					oldData = bp->oldData;
-			}
-		} else {
-			if (mem_readb(location) == 0xCC) {
-				if (oldData == 0xCC)
-					DEBUG_ShowMsg("DEBUG: Internal error while deactivating breakpoint.\n");
-
-				// Check if we are the last active breakpoint at this location
-				bool otherActive = (FindOtherActiveBreakpoint(location, this) != nullptr);
-
-				// If so, remove 0xCC and set old value
-				if (!otherActive)
-					mem_writeb(location, oldData);
-			}
-		}
+        ActivateInner(_active && enabled);
 	}
 #endif
 	active = _active;
 }
 
-// Statics
-static std::list<CBreakpoint *> BPoints = {};
+void CBreakpoint::Enable(bool _enabled)
+{
+	if (enabled == _enabled)
+		return; // Nothing to do
+
+	enabled = _enabled;
+	ActivateInner(active && enabled);
+}
 
 #if C_HEAVY_DEBUGGER
 template <typename T>
@@ -443,12 +380,24 @@ template void DEBUG_UpdateMemoryReadBreakpoints<uint32_t>(const PhysPt addr);
 template void DEBUG_UpdateMemoryReadBreakpoints<uint64_t>(const PhysPt addr);
 #endif
 
+static void AddToList(CBreakpoint *bp)
+{
+    const auto it = std::lower_bound(BPoints.begin(),
+                                     BPoints.end(),
+                                     bp,
+                                     [](const CBreakpoint* x, const CBreakpoint* y) {
+                                         return x->GetId() < y->GetId();
+                                     });
+
+    BPoints.insert(it, bp);
+}
+
 CBreakpoint* CBreakpoint::AddBreakpoint(uint16_t seg, uint32_t off, bool once)
 {
 	auto bp = new CBreakpoint();
 	bp->SetAddress		(seg,off);
 	bp->SetOnce			(once);
-	BPoints.push_front	(bp);
+	AddToList(bp);
 	return bp;
 }
 
@@ -457,7 +406,7 @@ CBreakpoint* CBreakpoint::AddIntBreakpoint(uint8_t intNum, uint16_t ah, uint16_t
 	auto bp = new CBreakpoint();
 	bp->SetInt			(intNum,ah,al);
 	bp->SetOnce			(once);
-	BPoints.push_front	(bp);
+	AddToList(bp);
 	return bp;
 }
 
@@ -467,14 +416,13 @@ CBreakpoint* CBreakpoint::AddMemBreakpoint(uint16_t seg, uint32_t off)
 	bp->SetAddress		(seg,off);
 	bp->SetOnce			(false);
 	bp->SetType			(BKPNT_MEMORY);
-	BPoints.push_front	(bp);
+	AddToList(bp);
 	return bp;
 }
 
 void CBreakpoint::ActivateBreakpoints()
 {
 	// activate all breakpoints
-	std::list<CBreakpoint*>::iterator i;
 	for (auto &bp : BPoints)
 		bp->Activate(true);
 }
@@ -489,12 +437,22 @@ void CBreakpoint::DeactivateBreakpoints()
 void CBreakpoint::ActivateBreakpointsExceptAt(PhysPt adr)
 {
 	// activate all breakpoints, except those at adr
-	std::list<CBreakpoint*>::iterator i;
 	for (auto &bp : BPoints) {
 		// Do not activate breakpoints at adr
 		if (bp->GetType() == BKPNT_PHYSICAL && bp->GetLocation() == adr)
 			continue;
 		bp->Activate(true);
+	}
+}
+
+void CBreakpoint::EnableBreakpoint(int id, bool enable)
+{
+	for (auto& bp : BPoints) {
+		// Do not activate breakpoints at adr
+		if (bp->GetId() == id) {
+			bp->Enable(enable);
+			return;
+		}
 	}
 }
 
@@ -659,11 +617,17 @@ bool CBreakpoint::IsBreakpoint(uint16_t seg, uint32_t off)
 	return FindPhysBreakpoint(seg, off, false) != nullptr;
 }
 
-bool CBreakpoint::DeleteBreakpoint(uint16_t seg, uint32_t off)
+bool CBreakpoint::DeleteBreakpoint(int id)
 {
-	CBreakpoint* bp = FindPhysBreakpoint(seg, off, false);
-	if (bp) {
+	for (auto i = BPoints.begin(); i != BPoints.end(); ++i) {
+		auto bp = *i;
+
+		if (bp->GetId() != id) {
+			continue;
+		}
+
 		BPoints.remove(bp);
+		bp->Activate(false);
 		delete bp;
 		return true;
 	}
@@ -671,6 +635,18 @@ bool CBreakpoint::DeleteBreakpoint(uint16_t seg, uint32_t off)
 	return false;
 }
 
+bool CBreakpoint::DeleteBreakpoint(uint16_t seg, uint32_t off)
+{
+	CBreakpoint* bp = FindPhysBreakpoint(seg, off, false);
+	if (bp) {
+		BPoints.remove(bp);
+		bp->Activate(false);
+		delete bp;
+		return true;
+	}
+
+	return false;
+}
 
 void CBreakpoint::ShowList(void)
 {
@@ -859,6 +835,7 @@ static void DrawRegisters(void) {
 }
 
 static void DrawCode(void) {
+#if !C_LIZARD_DEBUGGER
 	bool saveSel;
 	uint32_t disEIP = codeViewData.useEIP;
 	PhysPt start  = GetAddress(codeViewData.useCS,codeViewData.useEIP);
@@ -955,6 +932,7 @@ static void DrawCode(void) {
 
 	wattrset(dbg.win_code,0);
 	wrefresh(dbg.win_code);
+#endif
 }
 
 static void SetCodeWinStart()
@@ -1469,186 +1447,217 @@ bool ParseCommand(char* str) {
 	return false;
 }
 
-char* AnalyzeInstruction(char* inst, bool saveSelector) {
+char* AnalyzeInstruction(char* inst, bool saveSelector)
+{
 	static char result[256];
 
 	char instu[256];
 	char prefix[3];
 	uint16_t seg;
 
-	strcpy(instu,inst);
+	strcpy(instu, inst);
 	upcase(instu);
 
 	result[0] = 0;
-	char* pos = strchr(instu,'[');
+	char* pos = strchr(instu, '[');
 	if (pos) {
 		// Segment prefix ?
-		if (*(pos-1)==':') {
-			char* segpos = pos-3;
-			prefix[0] = tolower(*segpos);
-			prefix[1] = tolower(*(segpos+1));
-			prefix[2] = 0;
-			seg = (uint16_t)GetHexValue(segpos,segpos);
+		if (*(pos - 1) == ':') {
+			char* segpos = pos - 3;
+			prefix[0]    = tolower(*segpos);
+			prefix[1]    = tolower(*(segpos + 1));
+			prefix[2]    = 0;
+			seg          = (uint16_t)GetHexValue(segpos, segpos);
 		} else {
-			if (strstr(pos,"SP") || strstr(pos,"BP")) {
+			if (strstr(pos, "SP") || strstr(pos, "BP")) {
 				seg = SegValue(ss);
-				strcpy(prefix,"ss");
+				strcpy(prefix, "ss");
 			} else {
 				seg = SegValue(ds);
-				strcpy(prefix,"ds");
+				strcpy(prefix, "ds");
 			}
 		}
 
 		pos++;
-		uint32_t adr = GetHexValue(pos,pos);
-		while (*pos!=']') {
-			if (*pos=='+') {
+		uint32_t adr = GetHexValue(pos, pos);
+		while (*pos != ']') {
+			if (*pos == '+') {
 				pos++;
-				adr += GetHexValue(pos,pos);
-			} else if (*pos=='-') {
+				adr += GetHexValue(pos, pos);
+			} else if (*pos == '-') {
 				pos++;
-				adr -= GetHexValue(pos,pos);
-			} else
+				adr -= GetHexValue(pos, pos);
+			} else {
 				pos++;
+			}
 		}
-		uint32_t address = GetAddress(seg,adr);
+		uint32_t address = GetAddress(seg, adr);
 		if (!(get_tlb_readhandler(address)->flags & PFLAG_INIT)) {
 			static char outmask[] = "%s:[%04X]=%02X";
 
-			if (cpu.pmode) outmask[6] = '8';
-				switch (DasmLastOperandSize()) {
-			        case 8: {
-				        uint8_t val = mem_readb<MemOpMode::SkipBreakpoints>(
-				                address);
-				        outmask[12] = '2';
-				        sprintf(result, outmask, prefix, adr, val);
-			        } break;
-			        case 16: {
-				        uint16_t val = mem_readw<MemOpMode::SkipBreakpoints>(
-				                address);
-				        outmask[12] = '4';
-				        sprintf(result, outmask, prefix, adr, val);
-			        } break;
-			        case 32: {
-				        uint32_t val = mem_readd<MemOpMode::SkipBreakpoints>(
-				                address);
-				        outmask[12] = '8';
-				        sprintf(result, outmask, prefix, adr, val);
-			        } break;
-			        }
+			if (cpu.pmode) {
+				outmask[6] = '8';
+			}
+			switch (DasmLastOperandSize()) {
+			case 8: {
+				uint8_t val = mem_readb<MemOpMode::SkipBreakpoints>(
+				        address);
+				outmask[12] = '2';
+				sprintf(result, outmask, prefix, adr, val);
+			} break;
+			case 16: {
+				uint16_t val = mem_readw<MemOpMode::SkipBreakpoints>(
+				        address);
+				outmask[12] = '4';
+				sprintf(result, outmask, prefix, adr, val);
+			} break;
+			case 32: {
+				uint32_t val = mem_readd<MemOpMode::SkipBreakpoints>(
+				        address);
+				outmask[12] = '8';
+				sprintf(result, outmask, prefix, adr, val);
+			} break;
+			}
 		} else {
-			sprintf(result,"[illegal]");
+			sprintf(result, "[illegal]");
 		}
 		// Variable found ?
 		CDebugVar* var = CDebugVar::FindVar(address);
 		if (var) {
 			// Replace occurrence
-			char* pos1 = strchr(inst,'[');
-			char* pos2 = strchr(inst,']');
+			char* pos1 = strchr(inst, '[');
+			char* pos2 = strchr(inst, ']');
 			if (pos1 && pos2) {
 				char temp[256];
-				strcpy(temp,pos2);				// save end
-				pos1++; *pos1 = 0;				// cut after '['
-				strcat(inst,var->GetName());	// add var name
-				strcat(inst,temp);				// add end
+				strcpy(temp, pos2); // save end
+				pos1++;
+				*pos1 = 0;                    // cut after '['
+				strcat(inst, var->GetName()); // add var name
+				strcat(inst, temp);           // add end
 			}
 		}
 		// show descriptor info, if available
 		if ((cpu.pmode) && saveSelector) {
-			strcpy(curSelectorName,prefix);
+			strcpy(curSelectorName, prefix);
 		}
 	}
 	// If it is a callback add additional info
-	pos = strstr(inst,"callback");
+	pos = strstr(inst, "callback");
 	if (pos) {
 		pos += 9;
-		Bitu nr = GetHexValue(pos,pos);
+		Bitu nr           = GetHexValue(pos, pos);
 		const char* descr = CALLBACK_GetDescription(nr);
 		if (descr) {
-			strcat(inst,"  ("); strcat(inst,descr); strcat(inst,")");
+			strcat(inst, "  (");
+			strcat(inst, descr);
+			strcat(inst, ")");
 		}
 	}
 	// Must be a jump
-	if (instu[0] == 'J')
-	{
+	if (instu[0] == 'J') {
 		bool jmp = false;
 		switch (instu[1]) {
-		case 'A' :	{	jmp = (get_CF()?false:true) && (get_ZF()?false:true); // JA
-					}	break;
-		case 'B' :	{	if (instu[2] == 'E') {
-							jmp = (get_CF()?true:false) || (get_ZF()?true:false); // JBE
-						} else {
-							jmp = get_CF()?true:false; // JB
-						}
-					}	break;
-		case 'C' :	{	if (instu[2] == 'X') {
-							jmp = reg_cx == 0; // JCXZ
-						} else {
-							jmp = get_CF()?true:false; // JC
-						}
-					}	break;
-		case 'E' :	{	jmp = get_ZF()?true:false; // JE
-					}	break;
-		case 'G' :	{	if (instu[2] == 'E') {
-							jmp = (get_SF()?true:false)==(get_OF()?true:false); // JGE
-						} else {
-							jmp = (get_ZF()?false:true) && ((get_SF()?true:false)==(get_OF()?true:false)); // JG
-						}
-					}	break;
-		case 'L' :	{	if (instu[2] == 'E') {
-							jmp = (get_ZF()?true:false) || ((get_SF()?true:false)!=(get_OF()?true:false)); // JLE
-						} else {
-							jmp = (get_SF()?true:false)!=(get_OF()?true:false); // JL
-						}
-					}	break;
-		case 'M' :	{	jmp = true; // JMP
-					}	break;
-		case 'N' :	{	switch (instu[2]) {
-						case 'B' :	
-						case 'C' :	{	jmp = get_CF()?false:true;	// JNB / JNC
-									}	break;
-						case 'E' :	{	jmp = get_ZF()?false:true;	// JNE
-									}	break;
-						case 'O' :	{	jmp = get_OF()?false:true;	// JNO
-									}	break;
-						case 'P' :	{	jmp = get_PF()?false:true;	// JNP
-									}	break;
-						case 'S' :	{	jmp = get_SF()?false:true;	// JNS
-									}	break;
-						case 'Z' :	{	jmp = get_ZF()?false:true;	// JNZ
-									}	break;
-						}
-					}	break;
-		case 'O' :	{	jmp = get_OF()?true:false; // JO
-					}	break;
-		case 'P' :	{	if (instu[2] == 'O') {
-							jmp = get_PF()?false:true; // JPO
-						} else {
-							jmp = get_SF()?true:false; // JP / JPE
-						}
-					}	break;
-		case 'S' :	{	jmp = get_SF()?true:false; // JS
-					}	break;
-		case 'Z' :	{	jmp = get_ZF()?true:false; // JZ
-					}	break;
+		case 'A': {
+			jmp = (get_CF() ? false : true) &&
+			      (get_ZF() ? false : true); // JA
+		} break;
+		case 'B': {
+			if (instu[2] == 'E') {
+				jmp = (get_CF() ? true : false) ||
+				      (get_ZF() ? true : false); // JBE
+			} else {
+				jmp = get_CF() ? true : false; // JB
+			}
+		} break;
+		case 'C': {
+			if (instu[2] == 'X') {
+				jmp = reg_cx == 0; // JCXZ
+			} else {
+				jmp = get_CF() ? true : false; // JC
+			}
+		} break;
+		case 'E': {
+			jmp = get_ZF() ? true : false; // JE
+		} break;
+		case 'G': {
+			if (instu[2] == 'E') {
+				jmp = (get_SF() ? true : false) ==
+				      (get_OF() ? true : false); // JGE
+			} else {
+				jmp = (get_ZF() ? false : true) &&
+				      ((get_SF() ? true : false) ==
+				       (get_OF() ? true : false)); // JG
+			}
+		} break;
+		case 'L': {
+			if (instu[2] == 'E') {
+				jmp = (get_ZF() ? true : false) ||
+				      ((get_SF() ? true : false) !=
+				       (get_OF() ? true : false)); // JLE
+			} else {
+				jmp = (get_SF() ? true : false) !=
+				      (get_OF() ? true : false); // JL
+			}
+		} break;
+		case 'M': {
+			jmp = true; // JMP
+		} break;
+		case 'N': {
+			switch (instu[2]) {
+			case 'B':
+			case 'C': {
+				jmp = get_CF() ? false : true; // JNB / JNC
+			} break;
+			case 'E': {
+				jmp = get_ZF() ? false : true; // JNE
+			} break;
+			case 'O': {
+				jmp = get_OF() ? false : true; // JNO
+			} break;
+			case 'P': {
+				jmp = get_PF() ? false : true; // JNP
+			} break;
+			case 'S': {
+				jmp = get_SF() ? false : true; // JNS
+			} break;
+			case 'Z': {
+				jmp = get_ZF() ? false : true; // JNZ
+			} break;
+			}
+		} break;
+		case 'O': {
+			jmp = get_OF() ? true : false; // JO
+		} break;
+		case 'P': {
+			if (instu[2] == 'O') {
+				jmp = get_PF() ? false : true; // JPO
+			} else {
+				jmp = get_SF() ? true : false; // JP / JPE
+			}
+		} break;
+		case 'S': {
+			jmp = get_SF() ? true : false; // JS
+		} break;
+		case 'Z': {
+			jmp = get_ZF() ? true : false; // JZ
+		} break;
 		}
 		if (jmp) {
-			pos = strchr(instu,'$');
+			pos = strchr(instu, '$');
 			if (pos) {
-				pos = strchr(instu,'+');
+				pos = strchr(instu, '+');
 				if (pos) {
-					strcpy(result,"(down)");
+					strcpy(result, "(down)");
 				} else {
-					strcpy(result,"(up)");
+					strcpy(result, "(up)");
 				}
 			}
 		} else {
-			sprintf(result,"(no jmp)");
+			sprintf(result, "(no jmp)");
 		}
 	}
 	return result;
 }
-
 
 int32_t DEBUG_Run(int32_t amount,bool quickexit) {
 	skipFirstInstruction = true;
@@ -1667,8 +1676,6 @@ int32_t DEBUG_Run(int32_t amount,bool quickexit) {
 	}
 	return ret;
 }
-
-
 
 uint32_t DEBUG_CheckKeys(void) {
 	Bits ret=0;
@@ -1947,6 +1954,10 @@ Bitu DEBUG_Loop(void) {
 		DOSBOX_SetNormalLoop();
 		return 0;
 	}
+
+#if C_LIZARD_DEBUGGER
+	DEBUG_PollWork();
+#endif
 	return DEBUG_CheckKeys();
 }
 
@@ -1958,6 +1969,12 @@ void DEBUG_Enable(bool pressed)
 {
 	if (!pressed)
 		return;
+
+#if C_LIZARD_DEBUGGER
+	// Start debug host thread
+	DEBUG_StartHost();
+	return;
+#endif
 
 	// Maybe construct the debugger's UI
 	static bool was_ui_started = false;
@@ -1995,10 +2012,12 @@ void DEBUG_Enable(bool pressed)
 }
 
 void DEBUG_DrawScreen(void) {
+#if !C_LIZARD_DEBUGGER
 	DrawData();
 	DrawCode();
 	DrawRegisters();
 	DrawVariables();
+#endif
 }
 
 static void DEBUG_RaiseTimerIrq(void) {
@@ -2347,8 +2366,11 @@ Bitu DEBUG_EnableDebugger()
 
 Bitu debugCallback;
 
-void DEBUG_Init()
-{
+void DEBUG_Init() {
+#if C_LIZARD_DEBUGGER
+	DEBUG_StartHost();
+#endif
+
 	DEBUG_DrawScreen();
 
 	// Add some keyhandlers
@@ -2369,6 +2391,9 @@ void DEBUG_Init()
 
 void DEBUG_Destroy()
 {
+#if C_LIZARD_DEBUGGER
+	DEBUG_StopHost();
+#endif
 	CBreakpoint::DeleteAll();
 	CDebugVar::DeleteAll();
 

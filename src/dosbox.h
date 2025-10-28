@@ -64,6 +64,7 @@ const char* DOSBOX_GetDetailedVersion() noexcept;
 void DOSBOX_RunMachine();
 void DOSBOX_SetLoop(LoopHandler * handler);
 void DOSBOX_SetNormalLoop();
+LoopHandler* DOSBOX_GetLoop();
 
 void DOSBOX_SetMachineTypeFromConfig(SectionProp& section);
 

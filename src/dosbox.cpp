@@ -124,6 +124,9 @@ static Bitu normal_loop()
 				}
 			}
 #if C_DEBUGGER
+#if C_LIZARD_DEBUGGER
+			DEBUG_PollWork();
+#endif
 			if (DEBUG_ExitLoop()) {
 				return 0;
 			}
@@ -401,6 +404,10 @@ const char* DOSBOX_GetDetailedVersion() noexcept
 void DOSBOX_SetLoop(LoopHandler* handler)
 {
 	loop = handler;
+}
+
+LoopHandler* DOSBOX_GetLoop() {
+	return loop;
 }
 
 void DOSBOX_SetNormalLoop()

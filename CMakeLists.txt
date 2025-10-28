@@ -85,6 +85,7 @@ if (APPLE)
 endif()
 
 option(OPT_DEBUGGER "Enable debugger" OFF)
+option(OPT_LIZARD_DEBUGGER "Enable lizard debugger" OFF)
 option(OPT_HEAVY_DEBUGGER "Enable heavy debugger" OFF)
 if (OPT_HEAVY_DEBUGGER)
   set(OPT_DEBUGGER ON CACHE INTERNAL "")
@@ -273,6 +274,9 @@ set(C_DIRECTSERIAL ON)
 
 if (OPT_DEBUGGER)
   set(C_DEBUGGER ON)
+  if (OPT_LIZARD_DEBUGGER)
+      set(C_LIZARD_DEBUGGER ON)
+  endif()
 
   if (OPT_HEAVY_DEBUGGER)
     set(C_HEAVY_DEBUGGER ON)
