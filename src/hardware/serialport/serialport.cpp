@@ -177,6 +177,7 @@ void CSerial::log_ser(bool active, char const* format,...) {
 		const uint32_t len = safe_strlen(buf);
 		if(buf[len-1]!='\n') strcat(buf,"\r\n");
 		fputs(buf,debugfp);
+		DEBUG_ShowMsg("%s", buf);
 	}
 }
 #endif

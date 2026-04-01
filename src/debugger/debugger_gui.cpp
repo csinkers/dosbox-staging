@@ -44,11 +44,6 @@ extern int old_cursor_state;
 
 void DEBUG_ShowMsg(const char* format, ...)
 {
-	// Quit early if the window hasn't been created yet
-	if (!dbg.win_out) {
-		return;
-	}
-
 	char buf[512];
 	va_list msg;
 	va_start(msg, format);
@@ -61,6 +56,13 @@ void DEBUG_ShowMsg(const char* format, ...)
 	size_t len = safe_strlen(buf);
 	if (buf[len - 1] != '\n' && len + 1 < sizeof(buf)) {
 		strcat(buf, "\n");
+	}
+
+	OutputDebugStringA(buf);
+
+	// Quit early if the window hasn't been created yet
+	if (!dbg.win_out) {
+		return;
 	}
 
 	if (debuglog) {
