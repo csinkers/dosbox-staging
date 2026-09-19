@@ -146,6 +146,7 @@ if (APPLE)
 endif()
 
 option(OPT_DEBUGGER "Enable debugger" OFF)
+option(OPT_LIZARD_DEBUGGER "Enable lizard debugger" OFF)
 option(OPT_HEAVY_DEBUGGER "Enable heavy debugger" OFF)
 if (OPT_HEAVY_DEBUGGER)
   set(OPT_DEBUGGER ON CACHE INTERNAL "")
@@ -339,6 +340,9 @@ endif()
 
 if (OPT_DEBUGGER)
   set(C_DEBUGGER ON)
+  if (OPT_LIZARD_DEBUGGER)
+      set(C_LIZARD_DEBUGGER ON)
+  endif()
 
   if (OPT_HEAVY_DEBUGGER)
     set(C_HEAVY_DEBUGGER ON)
@@ -473,7 +477,9 @@ add_executable(dosbox src/main.cpp src/dosbox.cpp)
 target_include_directories(
   dosbox PUBLIC include ${CMAKE_CURRENT_BINARY_DIR}/include
 )
+
 if (OPT_DEBUGGER)
+  find_package(SDL2_net CONFIG QUIET)
   set_target_properties( dosbox PROPERTIES OUTPUT_NAME dosbox_with_debugger)
 endif()
 

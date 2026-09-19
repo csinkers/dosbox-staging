@@ -16,6 +16,7 @@ missed.txt
 # Common names for meson build dirs
 /build
 /builddir
+/out
 
 # VCPKG
 vcpkg_installed
