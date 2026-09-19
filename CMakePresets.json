@@ -142,6 +142,7 @@
       "generator": "Visual Studio 17 2022",
       "binaryDir": "${sourceDir}/build/debug-windows",
       "cacheVariables": {
+        "OPT_DEBUGGER": "TRUE",
         "IS_PRESET_USED" : "TRUE",
         "CMAKE_GENERATOR_TOOLSET": "ClangCL",
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
