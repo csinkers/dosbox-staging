@@ -1,5 +1,4 @@
 #pragma once
-#include <algorithm>
 #include <vector>
 #include <span>
 #include <stdexcept>
@@ -53,64 +52,64 @@ public:
 	virtual void Bytes(std::string_view name, std::vector<uint8_t>& buffer) = 0;
 	// End virtual methods
 
-	template<class Tname> // Tname = std::string_view or int
-	void Bool(Tname name, bool& value)
+	template<class TName> // TName = std::string_view or int
+	void Bool(TName name, bool& value)
 	{
 		uint8_t val = value ? 1 : 0;
 		UInt8(name, val);
 		value = (val != 0);
 	}
 
-	template<class T, class Tname> // Tname = std::string_view or int
-	void Int8Enum(Tname name, T& value)
+	template<class T, class TName> // TName = std::string_view or int
+	void Int8Enum(TName name, T& value)
 	{
 		int8_t val = static_cast<int8_t>(value);
 		Int8(name, val);
 		value = static_cast<T>(val);
 	}
 
-	template<class T, class Tname> // Tname = std::string_view or int
-	void Int16Enum(Tname name, T& value)
+	template<class T, class TName> // TName = std::string_view or int
+	void Int16Enum(TName name, T& value)
 	{
 		int16_t val = static_cast<int16_t>(value);
 		Int16(name, val);
 		value = static_cast<T>(val);
 	}
 
-	template<class T, class Tname> // Tname = std::string_view or int
-	void Int32Enum(Tname name, T& value)
+	template<class T, class TName> // TName = std::string_view or int
+	void Int32Enum(TName name, T& value)
 	{
 		int32_t val = static_cast<int32_t>(value);
 		Int32(name, val);
 		value = static_cast<T>(val);
 	}
 
-	template<class T, class Tname> // Tname = std::string_view or int
-	void UInt8Enum(Tname name, T& value)
+	template<class T, class TName> // TName = std::string_view or int
+	void UInt8Enum(TName name, T& value)
 	{
 		uint8_t val = static_cast<uint8_t>(value);
 		UInt8(name, val);
 		value = static_cast<T>(val);
 	}
 
-	template<class T, class Tname> // Tname = std::string_view or int
-	void UInt16Enum(Tname name, T& value)
+	template<class T, class TName> // TName = std::string_view or int
+	void UInt16Enum(TName name, T& value)
 	{
 		uint16_t val = static_cast<uint16_t>(value);
 		UInt16(name, val);
 		value = static_cast<T>(val);
 	}
 
-	template<class T, class Tname> // Tname = std::string_view or int
-	void UInt32Enum(Tname name, T& value)
+	template<class T, class TName> // TName = std::string_view or int
+	void UInt32Enum(TName name, T& value)
 	{
 		uint32_t val = static_cast<uint32_t>(value);
 		UInt32(name, val);
 		value = static_cast<T>(val);
 	}
 
-	template<typename T, typename Tname> // Tname = std::string_view or int
-	void Array(Tname name, std::vector<T>& value)
+	template<typename T, typename TName> // TName = std::string_view or int
+	void Array(TName name, std::vector<T>& value)
 	{
 		Begin(name);
 
@@ -127,8 +126,8 @@ public:
 		End();
 	}
 
-	template<typename T, typename Tname> // Tname = std::string_view or int
-	void Array(Tname name, std::vector<T>& value, std::function<void(int, T&, ISerdes&)> serdes)
+	template<typename T, typename TName> // TName = std::string_view or int
+	void Array(TName name, std::vector<T>& value, std::function<void(int, T&, ISerdes&)> serdes)
 	{
 		Begin(name);
 

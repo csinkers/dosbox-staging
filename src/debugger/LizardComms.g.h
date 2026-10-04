@@ -5,6 +5,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <condition_variable>
 #include <string>
 #include "Serdes.h"
 
@@ -25,10 +26,10 @@ namespace LizardComms
     class ISocket
     {
     public:
-		virtual ~ISocket() = default;
+        virtual ~ISocket() = default;
         virtual ISocket* Accept() = 0;
-		virtual void Send(std::span<const uint8_t> buffer) = 0;
-		virtual void Receive(std::span<uint8_t> buffer) = 0;
+        virtual void Send(std::span<const uint8_t> buffer) = 0;
+        virtual void Receive(std::span<uint8_t> buffer) = 0;
         virtual void GetPeerAddress(uint32_t &ip, uint16_t& port) const = 0;
         virtual std::string GetPeerAddress() const = 0;
         virtual void Close() = 0;
@@ -37,11 +38,11 @@ namespace LizardComms
     class BitfieldEvent
     {
         int state_;
-        std::mutex m_;
-        std::condition_variable cv_;
+        std::mutex m_ = {};
+        std::condition_variable cv_ = {};
 
     public:
-        BitfieldEvent() : state_(false) {}
+        BitfieldEvent() : state_(0) {}
         void set(int flags)
         {
             std::unique_lock ul(m_);
@@ -82,7 +83,7 @@ namespace LizardComms
 
     class ManualResetEvent
     {
-        BitfieldEvent e_;
+        BitfieldEvent e_ = {};
 
     public:
         void set() { e_.set(1); }
@@ -117,9 +118,13 @@ namespace LizardComms
 
     class CommsError : public std::exception
     {
+        std::string message_;
     public:
-        explicit CommsError(const std::string& message) : std::exception(message.c_str()) {}
+        const char* what() const noexcept override { return message_.c_str(); }
+        explicit CommsError(const std::string& message) : message_(message) {}
     };
+
+    // End common Lizard.CodeGen code, begin contract-defined code.
 
     enum class LBreakpointType1 : uint8_t
     {
@@ -188,11 +193,11 @@ namespace LizardComms
 
     struct LAddress1
     {
-        uint16_t segment;
-        uint32_t offset;
+        uint16_t segment = {};
+        uint32_t offset = {};
 
-        template<typename Tname>
-        void Serdes(Tname name, ISerdes& s)
+        template<typename TName>
+        void Serdes(TName name, ISerdes& s)
         {
             s.Begin(name);
             s.UInt16("segment", segment);
@@ -203,26 +208,26 @@ namespace LizardComms
 
     struct LRegisters1
     {
-        uint32_t flags;
-        uint32_t eax;
-        uint32_t ebx;
-        uint32_t ecx;
-        uint32_t edx;
-        uint32_t esi;
-        uint32_t edi;
-        uint32_t ebp;
-        uint32_t esp;
-        uint32_t eip;
-        uint16_t es;
-        uint16_t cs;
-        uint16_t ss;
-        uint16_t ds;
-        uint16_t fs;
-        uint16_t gs;
-        uint8_t is_stopped;
+        uint32_t flags = {};
+        uint32_t eax = {};
+        uint32_t ebx = {};
+        uint32_t ecx = {};
+        uint32_t edx = {};
+        uint32_t esi = {};
+        uint32_t edi = {};
+        uint32_t ebp = {};
+        uint32_t esp = {};
+        uint32_t eip = {};
+        uint16_t es = {};
+        uint16_t cs = {};
+        uint16_t ss = {};
+        uint16_t ds = {};
+        uint16_t fs = {};
+        uint16_t gs = {};
+        bool is_stopped = {};
 
-        template<typename Tname>
-        void Serdes(Tname name, ISerdes& s)
+        template<typename TName>
+        void Serdes(TName name, ISerdes& s)
         {
             s.Begin(name);
             s.UInt32("flags", flags);
@@ -241,19 +246,19 @@ namespace LizardComms
             s.UInt16("ds", ds);
             s.UInt16("fs", fs);
             s.UInt16("gs", gs);
-            s.UInt8("is_stopped", is_stopped);
+            s.Bool("is_stopped", is_stopped);
             s.End();
         }
     };
 
     struct LAssemblyLine1
     {
-        LAddress1 address;
-        std::string line;
-        std::vector<uint8_t> bytes;
+        LAddress1 address = {};
+        std::string line = {};
+        std::vector<uint8_t> bytes = {};
 
-        template<typename Tname>
-        void Serdes(Tname name, ISerdes& s)
+        template<typename TName>
+        void Serdes(TName name, ISerdes& s)
         {
             s.Begin(name);
             address.Serdes("address", s);
@@ -265,21 +270,21 @@ namespace LizardComms
 
     struct LBreakpoint1
     {
-        uint32_t id;
-        LAddress1 address;
-        LBreakpointType1 type;
-        uint8_t is_enabled;
-        uint8_t ah;
-        uint8_t al;
+        uint32_t id = {};
+        LAddress1 address = {};
+        LBreakpointType1 type = {};
+        bool is_enabled = {};
+        uint8_t ah = {};
+        uint8_t al = {};
 
-        template<typename Tname>
-        void Serdes(Tname name, ISerdes& s)
+        template<typename TName>
+        void Serdes(TName name, ISerdes& s)
         {
             s.Begin(name);
             s.UInt32("id", id);
             address.Serdes("address", s);
             s.UInt8Enum("type", type);
-            s.UInt8("is_enabled", is_enabled);
+            s.Bool("is_enabled", is_enabled);
             s.UInt8("ah", ah);
             s.UInt8("al", al);
             s.End();
@@ -288,21 +293,21 @@ namespace LizardComms
 
     struct LDescriptor1
     {
-        LDescriptorType1 type;
-        uint32_t offset;
-        uint32_t selector;
-        uint8_t dpl;
-        uint8_t is_big;
+        LDescriptorType1 type = {};
+        uint32_t offset = {};
+        uint32_t selector = {};
+        uint8_t dpl = {};
+        bool is_big = {};
 
-        template<typename Tname>
-        void Serdes(Tname name, ISerdes& s)
+        template<typename TName>
+        void Serdes(TName name, ISerdes& s)
         {
             s.Begin(name);
             s.UInt8Enum("type", type);
             s.UInt32("offset", offset);
             s.UInt32("selector", selector);
             s.UInt8("dpl", dpl);
-            s.UInt8("is_big", is_big);
+            s.Bool("is_big", is_big);
             s.End();
         }
     };

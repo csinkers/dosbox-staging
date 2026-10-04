@@ -8,6 +8,7 @@
 #include <list>
 #include <mutex>
 #include <thread>
+#include <format>
 #include <SDL_net.h>
 #include "LizardComms.g.h"
 
@@ -75,15 +76,15 @@ class WorkQueue {
 	private:
 	using CallbackEntry = std::function<void()>;
 
-	std::mutex mutex_;
-	std::list<CallbackEntry> callbacks_;
+	std::mutex mutex_ = {};
+	std::list<CallbackEntry> callbacks_ = {};
 };
 
 template<typename T>
 class ClientList
 {
-	std::mutex m_;
-	std::vector<std::shared_ptr<T>> clients_;
+	std::mutex m_ = {};
+	std::vector<std::shared_ptr<T>> clients_ = {};
 
 public:
 	void Add(const std::shared_ptr<T>& duplex)
@@ -95,7 +96,7 @@ public:
 	void Remove(const std::shared_ptr<T>& duplex)
 	{
 		std::unique_lock ul(m_);
-		const auto& it =
+		const auto it =
 			std::ranges::remove_if(
 				clients_,
 				[&duplex](const auto& x) { return x.get() == duplex.get(); }
@@ -201,6 +202,10 @@ public:
 		}
 	}
 
+	SdlNetSocket(const SdlNetSocket&) = delete;
+	SdlNetSocket(SdlNetSocket&&) = delete;
+	SdlNetSocket& operator=(const SdlNetSocket&) = delete;
+	SdlNetSocket& operator=(SdlNetSocket&&) = delete;
 	~SdlNetSocket() override { SdlNetSocket::Close(); }
 };
 
@@ -430,7 +435,7 @@ public:
 	void SetMemory(LAddress1& address, std::vector<uint8_t>& bytes) override
 	{
 		Do([&address, &bytes] {
-			printf("-> SetMemory(%x:%x, %llu)\n",
+			printf("-> SetMemory(%x:%x, %zu)\n",
 			       address.segment,
 			       address.offset,
 			       bytes.size());
