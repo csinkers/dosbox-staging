@@ -44,6 +44,16 @@ extern int old_cursor_state;
 
 void DEBUG_ShowMsg(const char* format, ...)
 {
+#if C_LIZARD_DEBUGGER
+	{
+		va_list args;
+		va_start(args, format);
+		vprintf(format, args);
+		va_end(args);
+		return;
+	}
+#endif
+
 	// Quit early if the window hasn't been created yet
 	if (!dbg.win_out) {
 		return;
